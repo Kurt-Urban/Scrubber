@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Backend",
+      "type": "node",
+      "request": "launch",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/packages/backend/dist/index.js",
+      "outFiles": ["${workspaceFolder}/**/*.js"]
+    },
+    {
+      "name": "Start Watcher",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "yarn",
+      "runtimeArgs": ["watch"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/packages/backend"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug with Watcher",
+      "configurations": ["Launch Backend", "Start Watcher"]
+    }
+  ]
+}
