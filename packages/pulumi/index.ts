@@ -2,38 +2,79 @@ import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as s3 from "@pulumi/aws/s3";
 
-// Create a bucket and expose it as a website
-let siteBucket = new s3.Bucket("s3-website-bucket", {
+let siteBucket = new s3.Bucket("scrubber-nextjs", {
   website: {
     indexDocument: "index.html",
+    errorDocument: "index.html",
   },
 });
 
-let siteDir = "out"; // Compiled Next.js site
+let siteDir = "../frontend/out";
 
-// Deploy site assets
 let bucketObject = new s3.BucketObject("nextjs-bucket", {
   bucket: siteBucket,
   source: new pulumi.asset.FileArchive(siteDir),
   key: "index.html",
+  contentType: "text/html",
 });
 
-// Wire up the static website bucket with a CDN
+let oai = new aws.cloudfront.OriginAccessIdentity("oai");
+
+let siteBucketPolicy = new aws.s3.BucketPolicy("siteBucketPolicy", {
+  bucket: siteBucket.id,
+  policy: pulumi
+    .all([siteBucket.arn, oai.iamArn])
+    .apply(([bucketArn, oaiArn]) =>
+      JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Principal: {
+              AWS: oaiArn,
+            },
+            Action: "s3:GetObject",
+            Resource: `${bucketArn}/*`,
+          },
+        ],
+      })
+    ),
+});
+
 let cdn = new aws.cloudfront.Distribution("cdn", {
   origins: [
     {
-      originPath: "/",
-      domainName: bucketObject.bucket.bucketRegionalDomainName,
+      originId: siteBucket.bucketDomainName,
+      domainName: siteBucket.bucketDomainName,
       s3OriginConfig: {
-        originAccessIdentity: cdnOriginPath,
+        originAccessIdentity: oai.cloudfrontAccessIdentityPath,
       },
     },
   ],
-  // ...additional configuration
+  defaultRootObject: "index.html",
+  waitForDeployment: false,
+  defaultCacheBehavior: {
+    targetOriginId: siteBucket.bucketDomainName,
+    viewerProtocolPolicy: "redirect-to-https",
+    allowedMethods: ["GET", "HEAD", "OPTIONS"],
+    cachedMethods: ["GET", "HEAD"],
+    forwardedValues: {
+      queryString: false,
+      cookies: {
+        forward: "none",
+      },
+    },
+  },
+  enabled: true,
+  restrictions: {
+    geoRestriction: {
+      restrictionType: "none",
+    },
+  },
+  viewerCertificate: {
+    cloudfrontDefaultCertificate: true,
+  },
 });
 
-// Export the website URL
-export const websiteUrl = pulumi.interpolate`http://${siteBucket.websiteEndpoint.hostname}`;
-
-// Export the CloudFront URL
-export const cdnUrl = cdn.distributionDomainName.apply((n) => `https://${n}`);
+export const websiteUrl = siteBucket.websiteEndpoint;
+export const cdnUrl = pulumi.interpolate`https://${cdn.domainName}`;

@@ -1,4 +1,4 @@
-name: project
+name: scrubber
 runtime: nodejs
 description: A minimal AWS TypeScript Pulumi program
 config:
