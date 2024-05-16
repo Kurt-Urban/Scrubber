@@ -7,16 +7,10 @@ let siteBucket = new s3.Bucket("scrubber-nextjs", {
     indexDocument: "index.html",
     errorDocument: "index.html",
   },
+  bucket: "scrubber-nextjs",
 });
 
 let siteDir = "../frontend/out";
-
-let bucketObject = new s3.BucketObject("nextjs-bucket", {
-  bucket: siteBucket,
-  source: new pulumi.asset.FileArchive(siteDir),
-  key: "index.html",
-  contentType: "text/html",
-});
 
 let oai = new aws.cloudfront.OriginAccessIdentity("oai");
 
@@ -64,6 +58,9 @@ let cdn = new aws.cloudfront.Distribution("cdn", {
         forward: "none",
       },
     },
+    minTtl: 0,
+    defaultTtl: 3600,
+    maxTtl: 86400,
   },
   enabled: true,
   restrictions: {
@@ -76,5 +73,7 @@ let cdn = new aws.cloudfront.Distribution("cdn", {
   },
 });
 
-export const websiteUrl = siteBucket.websiteEndpoint;
-export const cdnUrl = pulumi.interpolate`https://${cdn.domainName}`;
+export default {
+  websiteURL: siteBucket.websiteEndpoint,
+  cdnURL: pulumi.interpolate`https://${cdn.domainName}`,
+};
