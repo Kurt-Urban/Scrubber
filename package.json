@@ -1,0 +1,20 @@
+{
+  "name": "scrubber",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/Kurt-Urban/Scrubber.git",
+  "author": "Kurt-Urban",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "start:frontend": "yarn workspace frontend dev",
+    "start:backend": "yarn workspace backend start",
+    "build:frontend": "yarn workspace frontend build",
+    "build:backend": "yarn workspace backend build"
+  },
+  "dependencies": {
+    "typescript": "^5.4.5"
+  }
+}
