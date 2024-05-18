@@ -1,5 +1,6 @@
 {
   "name": "scrubber",
+  "version": "1.0.0",
   "main": "index.ts",
   "devDependencies": {
     "@types/mime-types": "^2.1.4",
