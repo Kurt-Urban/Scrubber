@@ -3,6 +3,8 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Formik, FormikProps, Form } from "formik";
 import { Checkbox, Dropdown } from "@/components";
+import * as yup from "yup";
+import classNames from "classnames";
 
 export type CleaningParams = {
   dropNa: boolean;
@@ -15,42 +17,23 @@ export type CleaningParams = {
 
 const defaultParams: CleaningParams = {
   dropNa: false,
-  dropDuplicates: false,
+  dropDuplicates: true,
   dropColumns: [],
   fillNa: false,
   fillNaValue: "",
   fillCustomNaValue: "",
 };
 
+const validationSchema = yup.object().shape({
+  fillCustomNaValue: yup
+    .string()
+    .when("fillNaValue", ([fillNaValue], schema) =>
+      fillNaValue === "custom" ? schema.required("Required Field.") : schema
+    ),
+});
+
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
-  const [progress, setProgress] = useState<number>(0);
-  const [fadeOut, setFadeOut] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (!file) {
-      setProgress(0);
-      setFadeOut(false);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setProgress((prevProgress) => {
-        if (prevProgress >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setFadeOut(true);
-          }, 1000);
-          return 100;
-        }
-        return prevProgress + 1;
-      });
-    }, 10);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [file]);
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -65,9 +48,7 @@ export default function Home() {
   };
 
   const handleSubmit = async (params: CleaningParams) => {
-    console.log(params);
     if (!file) return;
-
     const formData = new FormData();
     formData.append("file", file);
     formData.append("params", JSON.stringify(params));
@@ -96,7 +77,11 @@ export default function Home() {
       <div className="flex justify-center w-full mt-10">
         <h1 className="text-4xl font-thin">Scrubber CSV Cleaner</h1>
       </div>
-      <Formik initialValues={defaultParams} onSubmit={handleSubmit}>
+      <Formik
+        initialValues={defaultParams}
+        onSubmit={handleSubmit}
+        validationSchema={validationSchema}
+      >
         {({ values }: FormikProps<CleaningParams>) => {
           return (
             <Form className="container mx-auto">
@@ -108,7 +93,7 @@ export default function Home() {
                 >
                   <input
                     type="file"
-                    className="absolute  w-full h-full opacity-0 cursor-pointer"
+                    className="absolute top-0 w-full h-full opacity-0 cursor-pointer"
                     onChange={handleFileChange}
                   />
                   <span className="text-blue-gray-700">
@@ -116,54 +101,36 @@ export default function Home() {
                   </span>
                 </div>
               </div>
-              {file ? (
-                <>
-                  <div className="container w-1/2 mx-auto mt-6">
-                    <div
-                      className={`w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 relative transition-all duration-200 ${
-                        fadeOut ? "opacity-0" : "opacity-100"
-                      }`}
-                      style={{
-                        visibility:
-                          progress > 0 || fadeOut ? "visible" : "hidden",
-                      }}
-                    >
-                      <div
-                        className="bg-blue-600 h-2.5 rounded-full"
-                        style={{
-                          width: `${progress}%`,
-                        }}
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className={`w-full -top-4 bg-blue-600 hover:bg-blue-800 text-white p-2 rounded-md relative transition-opacity duration-1000 ${
-                        !fadeOut ? "opacity-0" : "opacity-100"
-                      }`}
-                    >
-                      Clean .CSV
-                    </button>
+
+              <div
+                className={classNames(
+                  "container  w-1/2 mx-auto mt-8 transition-all duration-500",
+                  {
+                    "opacity-0 pointer-events-none": !file,
+                  }
+                )}
+              >
+                <button
+                  type="submit"
+                  className="w-full -top-4 bg-blue-600 hover:bg-blue-800 text-white p-2 rounded-md relative transition-opacity duration-500"
+                >
+                  Clean .CSV
+                </button>
+                <div className={`transition-all duration-1000`}>
+                  <div className="container mx-auto mt-1 flex justify-center">
+                    <Checkbox
+                      name="dropDuplicates"
+                      label="Drop duplicate rows"
+                    />
+                    <Checkbox
+                      name="dropNa"
+                      label="Drop rows with missing values"
+                    />
+                    <Checkbox name="fillNa" label="Fill missing values" />
                   </div>
-                  <div
-                    className={`transition-all duration-1000 ${
-                      !fadeOut ? "opacity-0" : "opacity-100"
-                    }`}
-                  >
-                    <div className="container w-2/3 mx-auto mt-3 flex justify-center">
-                      <Checkbox
-                        name="dropNa"
-                        label="Drop rows with missing values"
-                      />
-                      <Checkbox
-                        name="dropDuplicates"
-                        label="Drop duplicate rows"
-                      />
-                      <Checkbox name="fillNa" label="Fill missing values" />
-                    </div>
-                    <Dropdown values={values} />
-                  </div>
-                </>
-              ) : null}
+                  <Dropdown values={values} />
+                </div>
+              </div>
             </Form>
           );
         }}
