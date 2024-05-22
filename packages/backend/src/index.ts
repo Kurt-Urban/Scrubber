@@ -16,7 +16,7 @@ AWS.config = new AWS.Config({
 
 const app = express();
 app.use(cors());
-const port = 3001;
+const port = process.env.PORT || 3001;
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
