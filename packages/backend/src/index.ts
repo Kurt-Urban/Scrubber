@@ -16,12 +16,16 @@ AWS.config = new AWS.Config({
 
 const app = express();
 app.use(cors());
-const port = 3001;
+const port = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 const upload = multer({ storage: multer.memoryStorage() });
+
+app.get("/health", (req: Request, res: Response) => {
+  res.status(200).send("Server is healthy");
+});
 
 app.post("/", upload.single("file"), (req: Request, res: Response) => {
   const file = req?.file;

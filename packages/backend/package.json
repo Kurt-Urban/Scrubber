@@ -5,7 +5,8 @@
   "author": "Kurt Urban",
   "license": "MIT",
   "scripts": {
-    "build": "npx tsc",
+    "build": "tsc",
+    "zip": "zip -r backend.zip . -x \"node_modules/*\" -x \".env\" -x \"src/*\"",
     "start": "node dist/index.js",
     "dev": "nodemon src/index.ts",
     "watch": "tsc -w"
