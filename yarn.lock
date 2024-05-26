@@ -1140,7 +1140,7 @@
     mime "^2.0.0"
     resolve "^1.7.1"
 
-"@pulumi/awsx@^2.0.2":
+"@pulumi/awsx@^2.10.0":
   version "2.10.0"
   resolved "https://registry.yarnpkg.com/@pulumi/awsx/-/awsx-2.10.0.tgz#db596f3da4a4dbfff8b312e5fdf5b4de391d5ef0"
   integrity sha512-ozGMwmZbLI1+CGW2o7l10/qdncrR9ve0aN9BW2w4Td7dywSgbP5JhwfjCQTyVp60zLB/kjNRpTC+Ed6c6Cq4TQ==

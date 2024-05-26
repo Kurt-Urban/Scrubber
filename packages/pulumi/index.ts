@@ -1,13 +1,15 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
+import * as awsx from "@pulumi/awsx";
 import * as s3 from "@pulumi/aws/s3";
+import * as docker from "@pulumi/docker";
 import * as synced from "@pulumi/synced-folder";
 
 let siteDir = "../frontend/out";
 
 // Create the S3 bucket with website configuration
 const siteBucket = new aws.s3.Bucket("scrubber-frontend", {
-  bucket: "scrubber-frontend",
+  bucket: `scrubber-frontend-${pulumi.getStack()}`,
   acl: "private",
   website: {
     indexDocument: "index.html",
@@ -89,149 +91,73 @@ let cdn = new aws.cloudfront.Distribution("cdn", {
   },
 });
 
-// Create an AWS S3 bucket
-const backendBucket = new aws.s3.Bucket("scrubber-backend", {
-  bucket: "scrubber-backend",
-});
+// Create an ECS cluster to deploy into.
+const cluster = new aws.ecs.Cluster("scrubber-cluster", {});
 
-// Upload the Express.js app bundle to the S3 bucket
-const backendZip = new aws.s3.BucketObject("backend", {
-  bucket: backendBucket.bucket,
-  source: new pulumi.asset.FileAsset("../backend/backend.zip"),
-  contentType: "application/zip",
-});
-
-// Create an Elastic Beanstalk application
-const app = new aws.elasticbeanstalk.Application("scrubber-backend-app", {
-  name: "scrubber-backend-app",
-});
-
-// Create an Elastic Beanstalk application version
-const appVersion = new aws.elasticbeanstalk.ApplicationVersion("appVersion", {
-  application: app.name,
-  bucket: backendBucket.bucket,
-  key: backendZip.key,
-  description: "Version for scrubber-backend-app",
-  tags: {
-    s3Bucket: backendBucket.bucket,
-    s3Key: backendZip.key,
+// Create a load balancer to listen for requests and route them to the container.
+const loadbalancer = new awsx.lb.ApplicationLoadBalancer("loadbalancer", {
+  listeners: [
+    {
+      port: 80,
+      protocol: "HTTP",
+    },
+  ],
+  defaultTargetGroup: {
+    port: 3000,
+    protocol: "HTTP",
+    targetType: "ip",
+    healthCheck: {
+      path: "/health", // Set the health check path
+      interval: 60, // Interval in seconds
+      timeout: 5, // Timeout in seconds
+      healthyThreshold: 2, // Number of successful checks before considering healthy
+      unhealthyThreshold: 2, // Number of failed checks before considering unhealthy
+    },
   },
 });
 
-// Define the policy document to assume the role
-const assumeRolePolicy = aws.iam.getPolicyDocument({
-  statements: [
-    {
-      effect: "Allow",
-      principals: [
+// Create the ECR repository to store our container image
+const repo = new awsx.ecr.Repository("repo", {
+  forceDelete: true,
+});
+
+// Build and publish our application's container image from ./app to the ECR repository.
+const image = new awsx.ecr.Image("image", {
+  repositoryUrl: repo.url,
+  context: "../backend",
+  platform: "linux/amd64",
+  dockerfile: "../backend/Dockerfile",
+});
+
+// Define the service and configure it to use our image and load balancer.
+const service = new awsx.ecs.FargateService("scrubber-be", {
+  cluster: cluster.arn,
+  assignPublicIp: true,
+  taskDefinitionArgs: {
+    container: {
+      name: "scrubber-be-container",
+      image: image.imageUri,
+      cpu: 128,
+      memory: 512,
+      essential: true,
+      portMappings: [
         {
-          type: "Service",
-          identifiers: ["ec2.amazonaws.com"],
-        },
-        {
-          type: "Service",
-          identifiers: ["elasticbeanstalk.amazonaws.com"],
+          containerPort: 3000,
         },
       ],
-      actions: ["sts:AssumeRole"],
+    },
+  },
+  desiredCount: 1,
+  loadBalancers: [
+    {
+      targetGroupArn: loadbalancer.defaultTargetGroup.arn,
+      containerName: "scrubber-be-container",
+      containerPort: 3000,
     },
   ],
 });
-
-// Function to create or get existing IAM role
-async function getOrCreateRole(roleName: string) {
-  try {
-    const existingRole = await aws.iam.getRole({ name: roleName });
-    return existingRole;
-  } catch (error) {
-    if ((error as any).code === "NoSuchEntity") {
-      const newRole = new aws.iam.Role(roleName, {
-        name: roleName,
-        path: "/",
-        assumeRolePolicy: assumeRolePolicy.then((policy) => policy.json),
-      });
-      return newRole;
-    } else {
-      throw error;
-    }
-  }
-}
-
-(async () => {
-  // Create or get the IAM role
-  const role = await getOrCreateRole("es_role");
-
-  // Attach the necessary policies to the role
-  const managedPolicies = [
-    "arn:aws:iam::aws:policy/AWSElasticBeanstalkFullAccess",
-    "arn:aws:iam::aws:policy/AWSElasticBeanstalkService",
-  ];
-
-  managedPolicies.forEach((policyArn) => {
-    new aws.iam.RolePolicyAttachment(`${policyArn.split("/").pop()}`, {
-      role: role.name,
-      policyArn: policyArn,
-    });
-  });
-
-  // Create an instance profile for the IAM role
-  const instanceProfile = new aws.iam.InstanceProfile("es_profile", {
-    name: "es_profile",
-    role: role.name,
-  });
-
-  // Create an AWS S3 bucket
-  const backendBucket = new aws.s3.Bucket("scrubber-backend", {
-    bucket: "scrubber-backend",
-  });
-
-  // Upload the Express.js app bundle to the S3 bucket
-  const backendZip = new aws.s3.BucketObject("backend", {
-    bucket: backendBucket.bucket,
-    source: new pulumi.asset.FileAsset("../backend/backend.zip"),
-    contentType: "application/zip",
-  });
-
-  // Create an Elastic Beanstalk application
-  const app = new aws.elasticbeanstalk.Application("scrubber-backend-app", {
-    name: "scrubber-backend-app",
-  });
-
-  // Create an Elastic Beanstalk application version
-  const appVersion = new aws.elasticbeanstalk.ApplicationVersion("appVersion", {
-    application: app.name,
-    bucket: backendBucket.bucket,
-    key: backendZip.key,
-    description: "Version for scrubber-backend-app",
-    tags: {
-      s3Bucket: backendBucket.bucket,
-      s3Key: backendZip.key,
-    },
-  });
-
-  // Create an Elastic Beanstalk environment using the Node.js solution stack
-  const env = new aws.elasticbeanstalk.Environment("scrubber-backend-env", {
-    application: app.name,
-    solutionStackName: "64bit Amazon Linux 2023 v6.1.5 running Node.js 20",
-    version: appVersion,
-    settings: [
-      {
-        namespace: "aws:autoscaling:launchconfiguration",
-        name: "IamInstanceProfile",
-        value: instanceProfile.arn,
-      },
-      {
-        namespace: "aws:elasticbeanstalk:environment:process:default",
-        name: "PORT",
-        value: "8080",
-      },
-    ],
-  });
-})();
-
-// Export the URLs
 export default {
-  websiteURL: siteBucket.websiteEndpoint,
-  cdnURL: pulumi.interpolate`https://${cdn.domainName}`,
-  backendBucketName: backendBucket.bucket,
+  // websiteURL: siteBucket.websiteEndpoint,
+  // cdnURL: pulumi.interpolate`https://${cdn.domainName}`,
+  backendURL: pulumi.interpolate`http://${loadbalancer.loadBalancer.dnsName}`,
 };
