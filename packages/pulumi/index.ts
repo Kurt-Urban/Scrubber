@@ -1,8 +1,6 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as awsx from "@pulumi/awsx";
-import * as s3 from "@pulumi/aws/s3";
-import * as docker from "@pulumi/docker";
 import * as synced from "@pulumi/synced-folder";
 
 let siteDir = "../frontend/out";
@@ -157,7 +155,7 @@ const service = new awsx.ecs.FargateService("scrubber-be", {
   ],
 });
 export default {
-  // websiteURL: siteBucket.websiteEndpoint,
-  // cdnURL: pulumi.interpolate`https://${cdn.domainName}`,
+  websiteURL: siteBucket.websiteEndpoint,
+  cdnURL: pulumi.interpolate`https://${cdn.domainName}`,
   backendURL: pulumi.interpolate`http://${loadbalancer.loadBalancer.dnsName}`,
 };
