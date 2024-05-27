@@ -1154,6 +1154,13 @@
     docker-classic "npm:@pulumi/docker@3.6.1"
     mime "^2.0.0"
 
+"@pulumi/command@^0.11.1":
+  version "0.11.1"
+  resolved "https://registry.yarnpkg.com/@pulumi/command/-/command-0.11.1.tgz#81e5e252f566a735c0e05a73390ed70afd59db5b"
+  integrity sha512-rKo0fJ+nHP2xPwILZ92Rzpj1fHMXj+AENgSyJ0V0LGjxYCI1WRiJaYmQuFjLbk1YVccHOVR8jcnidMorSdxgeg==
+  dependencies:
+    "@pulumi/pulumi" "^3.0.0"
+
 "@pulumi/docker@^4.5.1":
   version "4.5.3"
   resolved "https://registry.yarnpkg.com/@pulumi/docker/-/docker-4.5.3.tgz#e6efa68a30aeae3ac7b5ee8282096ecb5e341d4c"

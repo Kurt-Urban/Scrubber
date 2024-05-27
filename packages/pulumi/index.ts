@@ -2,6 +2,7 @@ import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as awsx from "@pulumi/awsx";
 import * as synced from "@pulumi/synced-folder";
+import * as archive from "@pulumi/archive";
 
 let siteDir = "../frontend/out";
 
@@ -154,8 +155,45 @@ const service = new awsx.ecs.FargateService("scrubber-be", {
     },
   ],
 });
+
+const assumeRole = aws.iam.getPolicyDocument({
+  statements: [
+    {
+      effect: "Allow",
+      principals: [
+        {
+          type: "Service",
+          identifiers: ["lambda.amazonaws.com"],
+        },
+      ],
+      actions: ["sts:AssumeRole"],
+    },
+  ],
+});
+
+const iamForLambda = new aws.iam.Role("iam_for_lambda", {
+  name: "iam_for_lambda",
+  assumeRolePolicy: assumeRole.then((assumeRole) => assumeRole.json),
+});
+
+const lambda = archive.getFile({
+  type: "zip",
+  sourceFile: "../lambda/main.py",
+  outputPath: "../lambda/lambda.zip",
+});
+
+const testLambda = new aws.lambda.Function("file_processing_lambda", {
+  code: new pulumi.asset.FileArchive("../lambda/lambda.zip"),
+  name: "lambda_process_file",
+  role: iamForLambda.arn,
+  handler: "main.lambda_handler",
+  sourceCodeHash: lambda.then((lambda) => lambda.outputBase64sha256),
+  runtime: aws.lambda.Runtime.Python3d11,
+});
+
 export default {
   websiteURL: siteBucket.websiteEndpoint,
   cdnURL: pulumi.interpolate`https://${cdn.domainName}`,
   backendURL: pulumi.interpolate`http://${loadbalancer.loadBalancer.dnsName}`,
+  lambdaARN: testLambda.arn,
 };
