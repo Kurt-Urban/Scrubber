@@ -8,7 +8,7 @@ let siteDir = "../frontend/out";
 
 // Create the S3 bucket with website configuration
 const siteBucket = new aws.s3.Bucket("scrubber-frontend", {
-  bucket: `scrubber-frontend-${pulumi.getStack()}`,
+  bucket: `scrubber-frontend`,
   acl: "private",
   website: {
     indexDocument: "index.html",

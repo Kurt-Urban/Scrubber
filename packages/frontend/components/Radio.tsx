@@ -2,20 +2,22 @@
 import { Field } from "formik";
 import React, { FC } from "react";
 
-type CheckboxProps = {
+type RadioProps = {
   label: string;
   name: string;
+  value: string;
 };
 
-const Checkbox: FC<CheckboxProps> = ({ label, name }) => {
+const Radio: FC<RadioProps> = ({ label, name, value }) => {
   return (
     <>
       <div className="flex items-center mr-3 my-1">
         <Field
           className="w-4 h-4 text-blue-600 cursor-pointer bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-          type="checkbox"
+          type="radio"
           name={name}
           id={label + name}
+          value={value}
         />
         <label
           htmlFor={label + name}
@@ -28,4 +30,4 @@ const Checkbox: FC<CheckboxProps> = ({ label, name }) => {
   );
 };
 
-export default Checkbox;
+export default Radio;
