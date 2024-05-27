@@ -2,7 +2,12 @@ import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as s3 from "@pulumi/aws/s3";
 
-let siteBucket = new s3.Bucket("scrubber-nextjs", {
+let siteDir = "../frontend/out";
+
+// Create the S3 bucket with website configuration
+const siteBucket = new aws.s3.Bucket("scrubber-frontend", {
+  bucket: `scrubber-frontend`,
+  acl: "private",
   website: {
     indexDocument: "index.html",
     errorDocument: "index.html",

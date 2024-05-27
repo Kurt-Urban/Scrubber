@@ -7,11 +7,7 @@
       "request": "launch",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/packages/backend/src/index.ts",
-      "sourceMaps": true,
-      "outFiles": ["${workspaceFolder}/packages/backend/dist/**/*.js"],
-      "sourceMapPathOverrides": {
-        "webpack:///./src/*": "${workspaceFolder}/packages/backend/src/*"
-      }
+      "sourceMaps": true
     },
     {
       "name": "Start Watcher",
