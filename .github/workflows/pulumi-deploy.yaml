@@ -47,11 +47,11 @@ jobs:
           echo "aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
           echo "aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
 
-      - name: Run Pulumi preview
+      - name: Run Pulumi preview --stack prod
         run: pulumi preview
         working-directory: packages/pulumi
 
-      - name: Run Pulumi up
+      - name: Run Pulumi up --stack prod
         run: pulumi up --yes
         working-directory: packages/pulumi
 
@@ -94,5 +94,5 @@ jobs:
           echo "aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
 
       - name: Run Pulumi destroy
-        run: pulumi destroy --yes
+        run: pulumi destroy --yes --stack prod
         working-directory: packages/pulumi
