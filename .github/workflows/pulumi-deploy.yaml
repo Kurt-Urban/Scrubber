@@ -105,6 +105,14 @@ jobs:
           echo "aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
           echo "aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
 
+      - name: Ensure Pulumi stack exists
+        run: pulumi stack select prod --create
+        working-directory: packages/pulumi
+
+      - name: Set AWS region
+        run: pulumi config set aws:region us-west-2
+        working-directory: packages/pulumi
+
       - name: Run Pulumi destroy
         run: pulumi destroy --yes --stack prod
         working-directory: packages/pulumi

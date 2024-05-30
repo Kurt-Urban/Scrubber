@@ -2,11 +2,8 @@ FROM node:14-alpine
 
 # Set the working directory inside the container to /app
 WORKDIR /app
-
-# Copy package.json and yarn.lock files to the /app directory
 COPY package.json yarn.lock ./
-
-# Install dependencies using Yarn
+RUN npm install -g yarn
 RUN yarn install
 
 # Copy the rest of the application code to the /app directory
