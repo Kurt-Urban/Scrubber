@@ -1,0 +1,85 @@
+name: Pulumi Deploy and Destroy
+
+on:
+  push:
+    branches:
+      - master
+      - destroy
+
+  workflow_dispatch:
+
+jobs:
+  pulumi-deploy:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: "20"
+
+      - name: Install Yarn
+        run: npm install -g yarn
+
+      - name: Install Pulumi
+        run: curl -fsSL https://get.pulumi.com | sh
+
+      - name: Add Pulumi to PATH
+        run: echo "$HOME/.pulumi/bin" >> $GITHUB_PATH
+
+      - name: Install project dependencies
+        run: yarn install
+        working-directory: packages/pulumi
+
+      - name: Login to Pulumi
+        run: pulumi login
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+
+      - name: Set up Pulumi config
+        run: pulumi config set <config-key> <config-value>
+        working-directory: packages/pulumi
+
+      - name: Run Pulumi preview
+        run: pulumi preview
+        working-directory: packages/pulumi
+
+      - name: Run Pulumi up
+        run: pulumi up --yes
+        working-directory: packages/pulumi
+
+  pulumi-destroy:
+    if: github.ref == 'refs/heads/destroy'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: "20"
+
+      - name: Install Pulumi
+        run: curl -fsSL https://get.pulumi.com | sh
+
+      - name: Add Pulumi to PATH
+        run: echo "$HOME/.pulumi/bin" >> $GITHUB_PATH
+
+      - name: Install project dependencies
+        run: npm install
+        working-directory: packages/pulumi
+
+      - name: Login to Pulumi
+        run: pulumi login
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+
+      - name: Run Pulumi destroy
+        run: pulumi destroy --yes
+        working-directory: packages/pulumi
