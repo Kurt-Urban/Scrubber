@@ -48,20 +48,20 @@ jobs:
           echo "aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
 
       - name: Zip Lambda code
-          run: yarn zip:lambda
-          working-directory: ${{ github.workspace }}
+        run: yarn zip:lambda
+        working-directory: ${{ github.workspace }}
 
       - name: Ensure Pulumi stack exists
-          run: pulumi stack select prod --create
-          working-directory: packages/pulumi
+        run: pulumi stack select prod --create
+        working-directory: packages/pulumi
 
       - name: Run Pulumi preview
-          run: pulumi preview --stack prod
-          working-directory: packages/pulumi
+        run: pulumi preview --stack prod
+        working-directory: packages/pulumi
 
       - name: Run Pulumi up
-          run: pulumi up --yes --stack prod
-          working-directory: packages/pulumi
+        run: pulumi up --yes --stack prod
+        working-directory: packages/pulumi
 
   pulumi-destroy:
     if: github.ref == 'refs/heads/destroy'
