@@ -191,6 +191,16 @@ const testLambda = new aws.lambda.Function("file_processing_lambda", {
   runtime: aws.lambda.Runtime.Python3d11,
 });
 
+// Create S3 bucket for user uploads and processed files
+
+const userUploadsBucket = new aws.s3.Bucket("scrubber-user-uploads", {
+  acl: "private",
+});
+
+const processedFilesBucket = new aws.s3.Bucket("scrubber-processed-files", {
+  acl: "private",
+});
+
 export default {
   websiteURL: siteBucket.websiteEndpoint,
   cdnURL: pulumi.interpolate`https://${cdn.domainName}`,

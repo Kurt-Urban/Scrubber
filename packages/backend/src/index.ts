@@ -23,60 +23,111 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 const upload = multer({ storage: multer.memoryStorage() });
 
+const s3 = new AWS.S3();
+const lambda = new AWS.Lambda();
+
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).send("Server is healthy");
 });
 
-app.post("/", upload.single("file"), (req: Request, res: Response) => {
-  const file = req?.file;
-  if (file) {
+app.post(
+  "/process",
+  upload.single("file"),
+  async (req: Request, res: Response) => {
+    const file = req?.file;
+
+    if (!file) {
+      return res.status(400).send("No file found in the request");
+    }
+
     const params = {
       Bucket: "scrubber-user-uploads",
       Key: file.originalname,
     };
 
-    s3.headObject(params, (err, data) => {
-      if (err && err.code === "NotFound") {
-        // File does not exist in S3, proceed with upload
-        const uploadParams = {
-          Bucket: "scrubber-user-uploads",
-          Key: file.originalname,
-          Body: file.buffer,
-          Metadata: {
-            ...JSON.parse(req.body.params),
-          },
-        };
-
-        Object.keys(uploadParams.Metadata).forEach((key) => {
-          uploadParams.Metadata[key] = String(uploadParams.Metadata[key]);
-        });
-
-        s3.upload(
-          uploadParams,
-          (err: Error, _: AWS.S3.ManagedUpload.SendData) => {
-            if (err) {
-              console.error("Error uploading file to S3:", err);
-              res.status(500).send("Error uploading file to S3");
-            } else {
-              res.status(200).send("File uploaded to S3");
-            }
-          }
-        );
-      } else if (data) {
-        // File already exists in S3, return error response
-        res.status(400).send("File already exists in S3");
-      } else {
-        // Error occurred while checking S3, return error response
+    try {
+      await s3.headObject(params).promise();
+      return res.status(400).send("File already exists in S3");
+    } catch (err: any) {
+      if (err.code !== "NotFound") {
         console.error("Error checking S3:", err);
-        res.status(500).send("Error checking S3");
+        return res.status(500).send("Error checking S3");
       }
-    });
-  } else {
-    res.status(400).send("No file found in the request");
-  }
-});
+    }
 
-const s3 = new AWS.S3();
+    try {
+      const uploadParams = {
+        Bucket: "scrubber-user-uploads",
+        Key: file.originalname,
+        Body: file.buffer,
+        Metadata: {
+          ...JSON.parse(req.body.params),
+        },
+      };
+
+      Object.keys(uploadParams.Metadata).forEach((key) => {
+        uploadParams.Metadata[key] = String(uploadParams.Metadata[key]);
+      });
+
+      await s3.upload(uploadParams).promise();
+
+      const lambdaParams = {
+        FunctionName: "lambda_process_file",
+        InvocationType: "Event",
+        Payload: JSON.stringify({
+          bucket: "scrubber-user-uploads",
+          key: file.originalname,
+          params: JSON.parse(req.body.params),
+        }),
+      };
+
+      await lambda.invoke(lambdaParams).promise();
+
+      let retries = 0;
+
+      const checkProcessedBucket = async () => {
+        const params = {
+          Bucket: "scrubber-processed-files",
+          Key: file.originalname,
+        };
+        try {
+          await s3.headObject(params).promise();
+
+          // File exists in processed bucket
+          const signedUrl = s3.getSignedUrl("getObject", {
+            Bucket: "scrubber-processed-files",
+            Key: file.originalname,
+            Expires: 60,
+          });
+
+          // Return the signed URL to the client
+          res.status(200).send(signedUrl);
+        } catch (err: any) {
+          if (err.code === "NotFound") {
+            if (retries < 10) {
+              retries++;
+              console.log(
+                `File not found in processed bucket. Retrying in 5 seconds (${retries}/10)`
+              );
+              setTimeout(checkProcessedBucket, 5000);
+            } else {
+              res.status(500).send("Error processing file");
+            }
+          } else {
+            console.error("Error checking processed bucket:", err);
+            // Handle the error case
+            res.status(500).send("Error processing file");
+          }
+        }
+      };
+
+      checkProcessedBucket();
+    } catch (err) {
+      console.error("Error uploading file or invoking Lambda function:", err);
+      res.status(500).send("Error processing request");
+    }
+  }
+);
 
 app.get("/buckets", (req: Request, res: Response) => {
   s3.listBuckets((err, data) => {
