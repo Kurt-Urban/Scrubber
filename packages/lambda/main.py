@@ -2,15 +2,27 @@ import json
 import boto3
 import pandas as pd
 import io
+import os
 
 def lambda_handler(event, context):
     try:
+        # Set up AWS credentials from environment variables
+        aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
+        aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+        aws_region = os.getenv('AWS_REGION')
+
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            region_name=aws_region
+        )
+
         bucket_name = event['bucket']
         file_key = event['file_key']
         cleaning_options = event['cleaning_options']
 
         # Read File
-        s3 = boto3.client('s3')
         obj = s3.get_object(Bucket=bucket_name, Key=file_key)
         data = pd.read_csv(io.BytesIO(obj['Body'].read()))
 
