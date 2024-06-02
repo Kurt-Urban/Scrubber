@@ -3,8 +3,6 @@ FROM node:14-alpine
 # Set the working directory inside the container to /app
 WORKDIR /app
 
-RUN npm install -g yarn
-
 COPY package.json yarn.lock ./
 
 RUN yarn install
