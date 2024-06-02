@@ -5,6 +5,8 @@ WORKDIR /app
 
 COPY package.json yarn.lock ./
 
+RUN yarn global add typescript
+
 RUN yarn install
 
 # Copy the rest of the application code to the /app directory
