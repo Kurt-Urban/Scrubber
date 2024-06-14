@@ -159,9 +159,11 @@ const awsxExpressSetup = async () => {
       },
     ],
   });
+
+  return { loadBalancerDNS: loadbalancer.loadBalancer.dnsName };
 };
 
-awsxExpressSetup();
+const backendPromise = awsxExpressSetup();
 
 const assumeRole = aws.iam.getPolicyDocument({
   statements: [
@@ -209,8 +211,13 @@ const processedFilesBucket = new aws.s3.Bucket("scrubber-processed-files", {
   bucket: "scrubber-processed-files",
 });
 
+backendPromise.catch((err) => {
+  console.error(err);
+});
+
 export default {
   websiteURL: siteBucket.websiteEndpoint,
   cdnURL: pulumi.interpolate`https://${cdn.domainName}`,
   lambdaARN: testLambda.arn,
+  backendURL: backendPromise.then((res) => res.loadBalancerDNS),
 };

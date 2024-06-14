@@ -11,7 +11,7 @@
   "scripts": {
     "start:frontend": "yarn workspace frontend dev",
     "start:backend": "yarn workspace backend start",
-    "build:frontend": "yarn workspace frontend build",
+    "build:frontend": "node ./packages/pulumi/getDNS.js && yarn workspace frontend build",
     "build:backend": "yarn workspace backend build",
     "zip:lambda": "cd ./packages/lambda && zip -r lambda.zip ."
   },

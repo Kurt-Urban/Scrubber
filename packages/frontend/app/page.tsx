@@ -6,6 +6,7 @@ import { Checkbox, Dropdown, Radio, Spinner } from "@/components";
 import * as yup from "yup";
 import classNames from "classnames";
 import { MdCheckBox, MdOutlineDeleteOutline } from "react-icons/md";
+import config from "../config.json";
 
 export type CleaningParams = {
   dropDuplicates: boolean;
@@ -97,11 +98,18 @@ export default function Home() {
 
     try {
       setIsLoading(true);
-      const res = await axios.post("http://localhost:3001/", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const loadBalancerDNS = config.loadBalancerDNS;
+      const res = await axios.post(
+        loadBalancerDNS
+          ? `http://${loadBalancerDNS}/`
+          : "http://localhost:3001/",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
       console.log(res);
     } catch (error) {
       if (axios.isAxiosError(error)) {
