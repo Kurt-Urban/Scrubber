@@ -201,10 +201,12 @@ const testLambda = new aws.lambda.Function("file_processing_lambda", {
 // Create S3 bucket for user uploads and processed files
 const userUploadsBucket = new aws.s3.Bucket("scrubber-user-uploads", {
   acl: "private",
+  bucket: "scrubber-user-uploads",
 });
 
 const processedFilesBucket = new aws.s3.Bucket("scrubber-processed-files", {
   acl: "private",
+  bucket: "scrubber-processed-files",
 });
 
 export default {
