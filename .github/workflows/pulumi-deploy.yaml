@@ -35,6 +35,12 @@ jobs:
         run: yarn install
         working-directory: packages/pulumi
 
+      - name: Build Frontend
+        run: yarn build:frontend
+
+      - name: Build Backend
+        run: yarn build:backend
+
       - name: Login to Pulumi
         run: pulumi login
         env:
