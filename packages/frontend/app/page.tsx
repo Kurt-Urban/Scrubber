@@ -6,7 +6,6 @@ import { Checkbox, Dropdown, Radio, Spinner } from "@/components";
 import * as yup from "yup";
 import classNames from "classnames";
 import { MdCheckBox, MdOutlineDeleteOutline } from "react-icons/md";
-import config from "../config.json";
 
 export type CleaningParams = {
   dropDuplicates: boolean;
@@ -98,7 +97,7 @@ export default function Home() {
 
     try {
       setIsLoading(true);
-      const loadBalancerDNS = config.loadBalancerDNS;
+      const loadBalancerDNS = process.env.NEXT_PUBLIC_LB_DNS;
       const res = await axios.post(
         loadBalancerDNS
           ? `http://${loadBalancerDNS}/`

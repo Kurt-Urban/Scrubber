@@ -37,6 +37,8 @@ jobs:
 
       - name: Build Frontend
         run: yarn build:frontend
+        env:
+          NEXT_PUBLIC_LB_DNS: ${{ secrets.NEXT_PUBLIC_LB_DNS }}
 
       - name: Build Backend
         run: yarn build:backend
