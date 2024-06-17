@@ -35,6 +35,14 @@ jobs:
         run: yarn install
         working-directory: packages/pulumi
 
+      - name: Build Frontend
+        run: yarn build:frontend
+        env:
+          NEXT_PUBLIC_LB_DNS: ${{ secrets.NEXT_PUBLIC_LB_DNS }}
+
+      - name: Build Backend
+        run: yarn build:backend
+
       - name: Login to Pulumi
         run: pulumi login
         env:
@@ -47,9 +55,16 @@ jobs:
           echo "aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
           echo "aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
 
-      - name: Zip Lambda code
-        run: yarn zip:lambda
-        working-directory: ${{ github.workspace }}
+      - name: Create Lambda deployment package
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt -t package
+          cd package
+          zip -r9 ../lambda.zip .
+          cd ..
+          zip -g lambda.zip main.py
+        working-directory: packages/lambda
 
       - name: Ensure Pulumi stack exists
         run: pulumi stack select prod --create

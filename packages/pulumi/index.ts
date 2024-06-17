@@ -93,68 +93,77 @@ let cdn = new aws.cloudfront.Distribution("cdn", {
 // Create an ECS cluster to deploy into.
 const cluster = new aws.ecs.Cluster("scrubber-cluster", {});
 
-// Create a load balancer to listen for requests and route them to the container.
-const loadbalancer = new awsx.lb.ApplicationLoadBalancer("loadbalancer", {
-  listeners: [
+const awsxExpressSetup = async () => {
+  // Create a load balancer to listen for requests and route them to the container.
+  const loadbalancer = await new awsx.lb.ApplicationLoadBalancer(
+    "loadbalancer",
     {
-      port: 80,
-      protocol: "HTTP",
-    },
-  ],
-  defaultTargetGroup: {
-    port: 3000,
-    protocol: "HTTP",
-    targetType: "ip",
-    healthCheck: {
-      path: "/health", // Set the health check path
-      interval: 60, // Interval in seconds
-      timeout: 5, // Timeout in seconds
-      healthyThreshold: 2, // Number of successful checks before considering healthy
-      unhealthyThreshold: 2, // Number of failed checks before considering unhealthy
-    },
-  },
-});
-
-// Create the ECR repository to store our container image
-const repo = new awsx.ecr.Repository("repo", {
-  forceDelete: true,
-});
-
-// Build and publish our application's container image from ./app to the ECR repository.
-const image = new awsx.ecr.Image("image", {
-  repositoryUrl: repo.url,
-  context: "../backend",
-  platform: "linux/amd64",
-  dockerfile: "../backend/Dockerfile",
-});
-
-// Define the service and configure it to use our image and load balancer.
-const service = new awsx.ecs.FargateService("scrubber-be", {
-  cluster: cluster.arn,
-  assignPublicIp: true,
-  taskDefinitionArgs: {
-    container: {
-      name: "scrubber-be-container",
-      image: image.imageUri,
-      cpu: 128,
-      memory: 512,
-      essential: true,
-      portMappings: [
+      listeners: [
         {
-          containerPort: 3000,
+          port: 80,
+          protocol: "HTTP",
         },
       ],
+      defaultTargetGroup: {
+        port: 3000,
+        protocol: "HTTP",
+        targetType: "ip",
+        healthCheck: {
+          path: "/health", // Set the health check path
+          interval: 60, // Interval in seconds
+          timeout: 5, // Timeout in seconds
+          healthyThreshold: 2, // Number of successful checks before considering healthy
+          unhealthyThreshold: 2, // Number of failed checks before considering unhealthy
+        },
+      },
+    }
+  );
+
+  // Create the ECR repository to store our container image
+  const repo = await new awsx.ecr.Repository("repo", {
+    forceDelete: true,
+  });
+
+  // Build and publish our application's container image from ./app to the ECR repository.
+  const image = await new awsx.ecr.Image("image", {
+    repositoryUrl: repo.url,
+    context: "../backend",
+    platform: "linux/amd64",
+    dockerfile: "../backend/Dockerfile",
+  });
+
+  // Define the service and configure it to use our image and load balancer.
+  const service = await new awsx.ecs.FargateService("scrubber-be", {
+    cluster: cluster.arn,
+    assignPublicIp: true,
+    taskDefinitionArgs: {
+      container: {
+        name: "scrubber-be-container",
+        image: image.imageUri,
+        cpu: 128,
+        memory: 512,
+        essential: true,
+        portMappings: [
+          {
+            containerPort: 3000,
+          },
+        ],
+      },
     },
-  },
-  desiredCount: 1,
-  loadBalancers: [
-    {
-      targetGroupArn: loadbalancer.defaultTargetGroup.arn,
-      containerName: "scrubber-be-container",
-      containerPort: 3000,
-    },
-  ],
-});
+    desiredCount: 1,
+    loadBalancers: [
+      {
+        targetGroupArn: loadbalancer.defaultTargetGroup.arn,
+        containerName: "scrubber-be-container",
+        containerPort: 3000,
+      },
+    ],
+  });
+
+  return { loadBalancerDNS: loadbalancer.loadBalancer.dnsName };
+};
+
+const backendPromise = awsxExpressSetup();
 
 const assumeRole = aws.iam.getPolicyDocument({
   statements: [
@@ -192,18 +201,23 @@ const testLambda = new aws.lambda.Function("file_processing_lambda", {
 });
 
 // Create S3 bucket for user uploads and processed files
-
 const userUploadsBucket = new aws.s3.Bucket("scrubber-user-uploads", {
   acl: "private",
+  bucket: "scrubber-user-uploads",
 });
 
 const processedFilesBucket = new aws.s3.Bucket("scrubber-processed-files", {
   acl: "private",
+  bucket: "scrubber-processed-files",
+});
+
+backendPromise.catch((err) => {
+  console.error(err);
 });
 
 export default {
   websiteURL: siteBucket.websiteEndpoint,
   cdnURL: pulumi.interpolate`https://${cdn.domainName}`,
-  backendURL: pulumi.interpolate`http://${loadbalancer.loadBalancer.dnsName}`,
   lambdaARN: testLambda.arn,
+  backendURL: backendPromise.then((res) => res.loadBalancerDNS),
 };
