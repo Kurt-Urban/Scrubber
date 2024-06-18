@@ -100,8 +100,8 @@ export default function Home() {
       const loadBalancerDNS = process.env.NEXT_PUBLIC_LB_DNS;
       const res = await axios.post(
         loadBalancerDNS
-          ? `http://${loadBalancerDNS}/`
-          : "http://localhost:3001/",
+          ? `http://${loadBalancerDNS}/process`
+          : "http://localhost:3001/process",
         formData,
         {
           headers: {
