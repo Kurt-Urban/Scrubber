@@ -165,6 +165,16 @@ const awsxExpressSetup = async () => {
 
 const backendPromise = awsxExpressSetup();
 
+const lambdaBucket = new aws.s3.Bucket("lambda-deployment", {
+  bucket: "lambda-deployment",
+});
+
+const lambdaDeployment = new aws.s3.BucketObject("lambda_deployment_zip", {
+  bucket: lambdaBucket.id,
+  source: new pulumi.asset.FileAsset("../lambda/lambda_deployment.zip"),
+  key: "lambda_deployment.zip",
+});
+
 const assumeRole = aws.iam.getPolicyDocument({
   statements: [
     {
@@ -185,18 +195,12 @@ const iamForLambda = new aws.iam.Role("iam_for_lambda", {
   assumeRolePolicy: assumeRole.then((assumeRole) => assumeRole.json),
 });
 
-const lambda = archive.getFile({
-  type: "zip",
-  sourceFile: "../lambda/main.py",
-  outputPath: "../lambda/lambda.zip",
-});
-
 const testLambda = new aws.lambda.Function("file_processing_lambda", {
-  code: new pulumi.asset.FileArchive("../lambda/lambda.zip"),
+  s3Bucket: lambdaBucket.bucket,
+  s3Key: lambdaDeployment.key,
   name: "lambda_process_file",
   role: iamForLambda.arn,
   handler: "main.lambda_handler",
-  sourceCodeHash: lambda.then((lambda) => lambda.outputBase64sha256),
   runtime: aws.lambda.Runtime.Python3d11,
 });
 
