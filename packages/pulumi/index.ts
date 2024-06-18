@@ -165,8 +165,8 @@ const awsxExpressSetup = async () => {
 
 const backendPromise = awsxExpressSetup();
 
-const lambdaBucket = new aws.s3.Bucket("lambda-deployment", {
-  bucket: "lambda-deployment",
+const lambdaBucket = new aws.s3.Bucket("scrubber-lambda-deployment", {
+  bucket: "scrubber-lambda-deployment",
 });
 
 const lambdaDeployment = new aws.s3.BucketObject("lambda_deployment_zip", {
