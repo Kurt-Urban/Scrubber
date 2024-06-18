@@ -1,5 +1,6 @@
+"use client";
 import React, { FC } from "react";
-import { CleaningParams } from "@/app/page";
+import { CleaningParams } from "@/components/Home";
 import { useFormikContext, Field } from "formik";
 import { MdOutlineCancel } from "react-icons/md";
 import classNames from "classnames";

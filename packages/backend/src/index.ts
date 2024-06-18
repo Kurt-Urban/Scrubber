@@ -100,8 +100,10 @@ app.post(
             Expires: 60,
           });
 
+          await s3.deleteObject(params).promise();
+
           // Return the signed URL to the client
-          res.status(200).send(signedUrl);
+          return res.status(200).send(signedUrl);
         } catch (err: any) {
           if (err.code === "NotFound") {
             if (retries < 10) {
@@ -111,11 +113,14 @@ app.post(
               );
               setTimeout(checkProcessedBucket, 5000);
             } else {
+              await s3.deleteObject(params).promise();
+              console.error(
+                "File not found in processed bucket after 10 retries"
+              );
               res.status(500).send("Error processing file");
             }
           } else {
             console.error("Error checking processed bucket:", err);
-            // Handle the error case
             res.status(500).send("Error processing file");
           }
         }
