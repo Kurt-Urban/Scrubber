@@ -37,7 +37,13 @@ def lambda_handler(event, context):
             Bucket=bucket_name, 
             Key='processed_' + file_key, 
             Body=output_buffer, 
-            Metadata={'processing_report': report}
+            Metadata={
+                'processing_report': report,
+                'totalRows': str(stats['totalRows']),
+                'duplicateRows': str(stats['duplicateRows']),
+                'modifiedRows': str(stats['modifiedRows']),
+                'corruptedRows': str(stats['corruptedRows'])
+            }
         )
 
         return {
@@ -57,10 +63,21 @@ def lambda_handler(event, context):
 
 def preprocess_data(data, options):
     report = []
+        stats = {
+        'totalRows': len(data),
+        'duplicateRows': 0,
+        'modifiedRows': 0,
+        'corruptedRows': 0
+    }
+
     try:
+        initial_rows = len(data)
+
         # Drop duplicates
         if options.get('dropDuplicates', False):
+            before_dedup = len(data)
             data.drop_duplicates(inplace=True)
+            stats['duplicateRows'] = before_dedup - len(data)
             report.append("Removed duplicates")
         
         # Drop specified columns
@@ -73,10 +90,14 @@ def preprocess_data(data, options):
         if fill_na != 'none':
             fill_custom_na_value = options.get('fillCustomNaValue', None)
             fill_na_value = options.get('fillNaValue', None)
+            before_fillna = len(data)
             data = fill_missing_values(data, fill_na, fill_na_value, fill_custom_na_value)
+            after_fillna = len(data.dropna())
+            stats['modifiedRows'] = before_fillna - after_fillna
             report.append(f"Filled missing values using {fill_na} method")
 
-        return data, "\n".join(report)
+        stats['corruptedRows'] = initial_rows - len(data)
+        return data, "\n".join(report), stats
     except Exception as e:
         raise Exception(f"Error in preprocessing data: {str(e)}")
 
