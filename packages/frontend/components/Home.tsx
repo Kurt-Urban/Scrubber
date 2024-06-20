@@ -75,7 +75,6 @@ export default function Home() {
           },
         }
       );
-
       setIsLoading(false);
       setProcessedFile(res.data.processedFile);
       setFile(null);

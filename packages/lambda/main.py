@@ -34,11 +34,11 @@ def lambda_handler(event, context):
         output_buffer = io.BytesIO()
         processed_data.to_csv(output_buffer, index=False)
         output_buffer.seek(0)
-        s3.put_object(
-            Bucket="scrubber-processed-files",
-            Key='processed_' + file_key,
-            Body=output_buffer,
-            Metadata={'processing_report': report}
+        s3.upload_fileobj(
+            output_buffer,
+            "scrubber-processed-files",
+            'processed_' + file_key,
+            ExtraArgs={"Metadata": {'processing_report': report}}
         )
 
         return {
