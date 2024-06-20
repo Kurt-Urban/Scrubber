@@ -63,32 +63,31 @@ export default function Home() {
     formData.append("params", JSON.stringify(params));
     try {
       setIsLoading(true);
-      // const loadBalancerDNS = process.env.NEXT_PUBLIC_LB_DNS;
-      // const res = await axios.post(
-      //   loadBalancerDNS
-      //     ? `http://${loadBalancerDNS}/process`
-      //     : "http://localhost:3001/process",
-      //   formData,
-      //   {
-      //     headers: {
-      //       "Content-Type": "multipart/form-data",
-      //     },
-      //   }
-      // );
-      // console.log(res);
+      const loadBalancerDNS = process.env.NEXT_PUBLIC_LB_DNS;
+      const res = await axios.post(
+        loadBalancerDNS
+          ? `http://${loadBalancerDNS}/process`
+          : "http://localhost:3001/process",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
       setIsLoading(false);
-      // setProcessedFile(res.data.processedFile);
+      setProcessedFile(res.data.processedFile);
       setFile(null);
-      setProcessedFile("processedFile");
     } catch (error) {
-      // if (axios.isAxiosError(error)) {
-      //   console.error(error.message);
-      //   if (error.response) {
-      //     console.error(error.response.data);
-      //   }
-      // } else {
-      //   console.error(error);
-      // }
+      if (axios.isAxiosError(error)) {
+        console.error(error.message);
+        if (error.response) {
+          console.error(error.response.data);
+        }
+      } else {
+        console.error(error);
+      }
     }
   };
 
