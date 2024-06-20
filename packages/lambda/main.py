@@ -35,7 +35,7 @@ def lambda_handler(event, context):
         processed_data.to_csv(output_buffer, index=False)
         output_buffer.seek(0)
         s3.put_object(
-            Bucket=bucket_name,
+            Bucket="scrubber-processed-files",
             Key='processed_' + file_key,
             Body=output_buffer,
             Metadata={'processing_report': report}
