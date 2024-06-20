@@ -2,7 +2,14 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Formik, FormikProps, Form } from "formik";
-import { Checkbox, Dropdown, Radio, Spinner, UploadParams } from "@/components";
+import {
+  Checkbox,
+  Dropdown,
+  Radio,
+  Spinner,
+  Statistics,
+  UploadParams,
+} from "@/components";
 import * as yup from "yup";
 import classNames from "classnames";
 import { MdCheckBox, MdOutlineDeleteOutline } from "react-icons/md";
@@ -40,39 +47,63 @@ const validationSchema = yup.object().shape({
 });
 
 export default function Home() {
-  const { file, setIsLoading, isLoading } = useFileContext();
-  console.log(file);
+  const {
+    file,
+    setFile,
+    setIsLoading,
+    isLoading,
+    processedFile,
+    setProcessedFile,
+  } = useFileContext();
+
   const handleSubmit = async (params: FormValues) => {
     if (!file) return;
     const formData = new FormData();
     formData.append("file", file);
     formData.append("params", JSON.stringify(params));
-
     try {
       setIsLoading(true);
-      const loadBalancerDNS = process.env.NEXT_PUBLIC_LB_DNS;
-      const res = await axios.post(
-        loadBalancerDNS
-          ? `http://${loadBalancerDNS}/process`
-          : "http://localhost:3001/process",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-      console.log(res);
+      // const loadBalancerDNS = process.env.NEXT_PUBLIC_LB_DNS;
+      // const res = await axios.post(
+      //   loadBalancerDNS
+      //     ? `http://${loadBalancerDNS}/process`
+      //     : "http://localhost:3001/process",
+      //   formData,
+      //   {
+      //     headers: {
+      //       "Content-Type": "multipart/form-data",
+      //     },
+      //   }
+      // );
+      // console.log(res);
+      setIsLoading(false);
+      // setProcessedFile(res.data.processedFile);
+      setFile(null);
+      setProcessedFile("processedFile");
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        console.error(error.message);
-        if (error.response) {
-          console.error(error.response.data);
-        }
-      } else {
-        console.error(error);
-      }
+      // if (axios.isAxiosError(error)) {
+      //   console.error(error.message);
+      //   if (error.response) {
+      //     console.error(error.response.data);
+      //   }
+      // } else {
+      //   console.error(error);
+      // }
     }
+  };
+
+  const displayComponent = () => {
+    if (isLoading) {
+      return (
+        <div className="flex justify-center mt-14">
+          <Spinner />
+        </div>
+      );
+    }
+    if (processedFile) {
+      return <Statistics />;
+    }
+    return <UploadParams />;
   };
 
   return (
@@ -87,9 +118,7 @@ export default function Home() {
       >
         {({}: FormikProps<FormValues>) => {
           return (
-            <Form className="container mx-auto">
-              {isLoading ? <Spinner /> : <UploadParams />}
-            </Form>
+            <Form className="container mx-auto">{displayComponent()}</Form>
           );
         }}
       </Formik>

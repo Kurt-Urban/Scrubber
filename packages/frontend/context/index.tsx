@@ -14,6 +14,8 @@ interface FileState {
   setFileError: (error: boolean) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
+  processedFile: string | null;
+  setProcessedFile: (file: string | null) => void;
 }
 
 const Reducer = (
@@ -36,6 +38,11 @@ const Reducer = (
         ...state,
         isLoading: action.payload,
       };
+    case "SET_PROCESSED_FILE":
+      return {
+        ...state,
+        processedFile: action.payload,
+      };
     default:
       return state;
   }
@@ -48,6 +55,8 @@ const initialState: FileState = {
   setFileError: () => {},
   isLoading: false,
   setIsLoading: () => {},
+  processedFile: null,
+  setProcessedFile: () => {},
 };
 
 export const FileContext = createContext(initialState);
@@ -76,6 +85,13 @@ export const FileProvider: FC<{ children: ReactNode }> = ({ children }) => {
     });
   }
 
+  function setProcessedFile(file: string | null) {
+    dispatch({
+      type: "SET_PROCESSED_FILE",
+      payload: file,
+    });
+  }
+
   return (
     <FileContext.Provider
       value={{
@@ -85,6 +101,8 @@ export const FileProvider: FC<{ children: ReactNode }> = ({ children }) => {
         setFileError: setFileError,
         isLoading: state.isLoading,
         setIsLoading: setIsLoading,
+        processedFile: state.processedFile,
+        setProcessedFile: setProcessedFile,
       }}
     >
       {children}
