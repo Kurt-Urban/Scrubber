@@ -99,65 +99,64 @@ app.post(
 
     console.log("Lambda invocation result:", lambdaRes);
 
-    let retries = 0;
-
-    const checkProcessedBucket = async () => {
-      const params = {
-        Bucket: "scrubber-processed-files",
+    const checkProcessedBucket = async (): Promise<string> => {
+      const uploadParams = {
+        Bucket: "scrubber-user-uploads",
         Key: file.originalname,
       };
+
+      const processedParams = {
+        Bucket: "scrubber-processed-files",
+        Key: "processed_" + file.originalname,
+      };
+
       try {
-        await s3.headObject(params).promise();
+        // Check if the file exists in the processed bucket
+        await s3.headObject(processedParams).promise();
 
         // File exists in processed bucket
         const signedUrl = s3.getSignedUrl("getObject", {
           Bucket: "scrubber-processed-files",
-          Key: file.originalname,
+          Key: "processed_" + file.originalname,
           Expires: 60,
         });
 
-        await s3.deleteObject(params).promise();
+        return signedUrl;
+      } catch (processedErr: any) {
+        if (processedErr.code !== "NotFound") {
+          console.error("Error checking processed bucket:", processedErr);
+          throw processedErr;
+        }
 
-        // Return the signed URL to the client
-        return res.status(200).send(signedUrl);
-      } catch (err: any) {
-        if (err.code === "NotFound") {
-          if (retries < 10) {
-            retries++;
-            console.log(
-              `File not found in processed bucket. Retrying in 5 seconds (${retries}/10)`
-            );
-            setTimeout(checkProcessedBucket, 5000);
+        // Check if the file exists in the user uploads bucket
+        try {
+          await s3.headObject(uploadParams).promise();
+          // File exists in user uploads bucket, but not yet processed
+          console.log(
+            "File exists in user uploads bucket, but not yet processed"
+          );
+          return "File exists in user uploads bucket, but not yet processed";
+        } catch (uploadErr: any) {
+          if (uploadErr.code === "NotFound") {
+            // File does not exist in either bucket
+            console.error("File not found in either bucket");
+            throw new Error("File not found in either bucket");
           } else {
-            await s3.deleteObject(params).promise();
-            console.error(
-              "File not found in processed bucket after 10 retries"
-            );
-            res.status(500).send("Error processing file");
+            // Other error while checking user uploads bucket
+            console.error("Error checking user uploads bucket:", uploadErr);
+            throw uploadErr;
           }
-        } else {
-          console.error("Error checking processed bucket:", err);
-          res.status(500).send("Error processing file");
         }
       }
     };
 
-    checkProcessedBucket();
+    const signedUrl = await checkProcessedBucket();
+    return res.status(200).send({ url: signedUrl });
   }
 );
-
-app.get("/buckets", (req: Request, res: Response) => {
-  s3.listBuckets((err, data) => {
-    if (err) {
-      console.error("Error listing buckets:", err);
-      res.status(500).send("Error listing buckets");
-    } else {
-      const bucketNames = data.Buckets?.map((bucket) => bucket.Name) || [];
-      res.status(200).json(bucketNames);
-    }
-  });
-});
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
+
+export default app;

@@ -3,5 +3,6 @@
   "references": [
     { "path": "./packages/frontend" },
     { "path": "./packages/backend" }
-  ]
+  ],
+  "compilerOptions": { "esModuleInterop": true }
 }
