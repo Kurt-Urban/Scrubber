@@ -193,6 +193,9 @@ const assumeRole = aws.iam.getPolicyDocument({
 const iamForLambda = new aws.iam.Role("iam_for_lambda", {
   name: "iam_for_lambda",
   assumeRolePolicy: assumeRole.then((assumeRole) => assumeRole.json),
+  managedPolicyArns: [
+    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+  ],
 });
 
 const testLambda = new aws.lambda.Function("file_processing_lambda", {
