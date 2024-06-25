@@ -195,10 +195,11 @@ const iamForLambda = new aws.iam.Role("iam_for_lambda", {
   assumeRolePolicy: assumeRole.then((assumeRole) => assumeRole.json),
   managedPolicyArns: [
     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+    "arn:aws:iam::aws:policy/AmazonS3FullAccess",
   ],
 });
 
-const testLambda = new aws.lambda.Function("file_processing_lambda", {
+const processingLambda = new aws.lambda.Function("file_processing_lambda", {
   s3Bucket: lambdaBucket.bucket,
   s3Key: lambdaDeployment.key,
   name: "lambda_process_file",
@@ -225,6 +226,6 @@ const processedFilesBucket = new aws.s3.Bucket("scrubber-processed-files", {
 export default {
   // websiteURL: siteBucket.websiteEndpoint,
   // cdnURL: pulumi.interpolate`https://${cdn.domainName}`,
-  lambdaARN: testLambda.arn,
+  lambdaARN: processingLambda.arn,
   // backendURL: backendPromise.then((res) => res.loadBalancerDNS),
 };
