@@ -4,9 +4,8 @@ from main import lambda_handler
 from dotenv import load_dotenv
 import os
 
-
+# Load environment variables from .env file
 load_dotenv()
-
 
 # Define a mock context
 class Context:
@@ -17,7 +16,6 @@ class Context:
             "arn:aws:lambda:us-east-1:679410252035:function:lambda_process_file"
         )
         self.aws_request_id = "local_request_id"
-
 
 def test_lambda_handler():
     with open("event.json") as f:
@@ -42,13 +40,16 @@ def test_lambda_handler():
 
     destination_bucket_name = "scrubber-processed-files"
     processed_file_key = "processed_" + event["file_key"]
-    processed_file = s3.get_object(
-        Bucket=destination_bucket_name, Key=processed_file_key
-    )
-    processed_data = processed_file["Body"].read().decode("utf-8")
-    print("Processed Data:")
-    print(processed_data)
 
+    try:
+        processed_file = s3.get_object(
+            Bucket=destination_bucket_name, Key=processed_file_key
+        )
+        processed_data = processed_file["Body"].read().decode("utf-8")
+        print("Processed Data:")
+        print(processed_data)
+    except s3.exceptions.NoSuchKey:
+        print(f"No such key: {processed_file_key}")
 
 if __name__ == "__main__":
     test_lambda_handler()

@@ -3,7 +3,6 @@ import boto3
 import pandas as pd
 import io
 
-
 def lambda_handler(event, context):
     try:
         # Print event for debugging
@@ -24,6 +23,9 @@ def lambda_handler(event, context):
         # Preprocess Data and Generate Statistics Report
         processed_data, report, stats = preprocess_data(data, cleaning_options)
 
+        # Sanitize the report for metadata
+        sanitized_report = sanitize_metadata_value(report)
+
         # Save Processed File with Report and Statistics as Metadata
         output_buffer = io.BytesIO()
         processed_data.to_csv(output_buffer, index=False)
@@ -34,7 +36,7 @@ def lambda_handler(event, context):
             Key=processed_file_key,
             Body=output_buffer,
             Metadata={
-                "processing_report": report,
+                "processing_report": sanitized_report,
                 "totalRows": str(stats["totalRows"]),
                 "duplicateRows": str(stats["duplicateRows"]),
                 "modifiedRows": str(stats["modifiedRows"]),
@@ -51,6 +53,9 @@ def lambda_handler(event, context):
         print("Error:", str(e))
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
 
+def sanitize_metadata_value(value):
+    """Sanitize metadata value to be a valid HTTP header value."""
+    return value.replace('\n', ' ').replace('\r', ' ')
 
 def preprocess_data(data, options):
     report = []
@@ -95,7 +100,6 @@ def preprocess_data(data, options):
     except Exception as e:
         raise Exception(f"Error in preprocessing data: {str(e)}")
 
-
 def fill_missing_values(data, fill_na, fill_na_value, fill_custom_na_value):
     try:
         if fill_na == "drop":
@@ -116,7 +120,6 @@ def fill_missing_values(data, fill_na, fill_na_value, fill_custom_na_value):
         return data
     except Exception as e:
         raise Exception(f"Error in filling missing values: {str(e)}")
-
 
 def correct_data_formats(data):
     try:
