@@ -2,94 +2,103 @@ import json
 import boto3
 import pandas as pd
 import io
-import os
-
 
 def lambda_handler(event, context):
     try:
-        # Set up AWS credentials from environment variables
-        aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
-        aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-        aws_region = os.getenv("AWS_REGION")
+        # Print event for debugging
+        print("Event received:", json.dumps(event, indent=2))
 
-        s3 = boto3.client(
-            "s3",
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key,
-            region_name=aws_region,
-        )
+        s3 = boto3.client("s3")
 
-        bucket_name = event["bucket"]
+        # Hardcode bucket names
+        source_bucket_name = "scrubber-user-uploads"
+        destination_bucket_name = "scrubber-processed-files"
         file_key = event["file_key"]
         cleaning_options = event["cleaning_options"]
 
         # Read File
-        obj = s3.get_object(Bucket=bucket_name, Key=file_key)
+        obj = s3.get_object(Bucket=source_bucket_name, Key=file_key)
         data = pd.read_csv(io.BytesIO(obj["Body"].read()))
 
-        # Preprocess Data
-        processed_data, report = preprocess_data(data, cleaning_options)
+        # Preprocess Data and Generate Statistics Report
+        processed_data, report, stats = preprocess_data(data, cleaning_options)
 
-        # Save Processed File with Report as Metadata
+        # Sanitize the report for metadata
+        sanitized_report = sanitize_metadata_value(report)
+
+        # Save Processed File with Report and Statistics as Metadata
         output_buffer = io.BytesIO()
         processed_data.to_csv(output_buffer, index=False)
         output_buffer.seek(0)
-        s3.upload_fileobj(
-            output_buffer,
-            "scrubber-processed-files",
-            'processed_' + file_key,
-            ExtraArgs={"Metadata": {'processing_report': report}}
+        processed_file_key = "processed_" + file_key
+        s3.put_object(
+            Bucket=destination_bucket_name,
+            Key=processed_file_key,
+            Body=output_buffer,
+            Metadata={
+                "processing_report": sanitized_report,
+                "totalRows": str(stats["totalRows"]),
+                "duplicateRows": str(stats["duplicateRows"]),
+                "modifiedRows": str(stats["modifiedRows"]),
+                "corruptedRows": str(stats["corruptedRows"]),
+            },
         )
 
         return {
             "statusCode": 200,
-            "body": json.dumps({"processed_file_key": "processed_" + file_key}),
+            "body": json.dumps({"processed_file_key": processed_file_key}),
         }
 
     except Exception as e:
+        print("Error:", str(e))
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
 
+def sanitize_metadata_value(value):
+    """Sanitize metadata value to be a valid HTTP header value."""
+    return value.replace('\n', ' ').replace('\r', ' ')
 
 def preprocess_data(data, options):
     report = []
     stats = {
-        'totalRows': len(data),
-        'duplicateRows': 0,
-        'modifiedRows': 0,
-        'corruptedRows': 0
+        "totalRows": len(data),
+        "duplicateRows": 0,
+        "modifiedRows": 0,
+        "corruptedRows": 0,
     }
 
     try:
         initial_rows = len(data)
 
         # Drop duplicates
-        if options.get('dropDuplicates', False):
+        if options.get("dropDuplicates", False):
             before_dedup = len(data)
             data.drop_duplicates(inplace=True)
-            stats['duplicateRows'] = before_dedup - len(data)
+            stats["duplicateRows"] = before_dedup - len(data)
             report.append("Removed duplicates")
 
-        # Drop specified columns
-        if "dropColumns" in options:
-            data.drop(columns=options["dropColumns"], inplace=True)
-            report.append(f"Dropped columns: {', '.join(options['dropColumns'])}")
+        # Drop specified columns if the list is longer than 0
+        if "dropColumns" in options and len(options["dropColumns"]) > 0:
+            columns_to_drop = options["dropColumns"]
+            data.drop(columns=columns_to_drop, inplace=True, errors="ignore")
+            report.append(f"Dropped columns: {', '.join(columns_to_drop)}")
 
         # Fill missing values
-        fill_na = options.get('fillNa', 'none')
-        if fill_na != 'none':
-            fill_custom_na_value = options.get('fillCustomNaValue', None)
-            fill_na_value = options.get('fillNaValue', None)
+        fill_na = options.get("fillNa", "none")
+        if fill_na != "none":
+            fill_custom_na_value = options.get("fillCustomNaValue", None)
+            fill_na_value = options.get("fillNaValue", None)
             before_fillna = len(data)
-            data = fill_missing_values(data, fill_na, fill_na_value, fill_custom_na_value)
+            data = fill_missing_values(
+                data, fill_na, fill_na_value, fill_custom_na_value
+            )
             after_fillna = len(data.dropna())
-            stats['modifiedRows'] = before_fillna - after_fillna
+            stats["modifiedRows"] = before_fillna - after_fillna
             report.append(f"Filled missing values using {fill_na} method")
 
-        stats['corruptedRows'] = initial_rows - len(data)
+        stats["corruptedRows"] = initial_rows - len(data)
         return data, "\n".join(report), stats
     except Exception as e:
         raise Exception(f"Error in preprocessing data: {str(e)}")
-
 
 def fill_missing_values(data, fill_na, fill_na_value, fill_custom_na_value):
     try:
@@ -111,7 +120,6 @@ def fill_missing_values(data, fill_na, fill_na_value, fill_custom_na_value):
         return data
     except Exception as e:
         raise Exception(f"Error in filling missing values: {str(e)}")
-
 
 def correct_data_formats(data):
     try:

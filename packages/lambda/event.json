@@ -1,0 +1,8 @@
+{
+  "file_key": "breastcancer (1).csv",
+  "cleaning_options": {
+    "dropDuplicates": true,
+    "dropColumns": ["Age", "BMI"],
+    "fillNa": "drop"
+  }
+}

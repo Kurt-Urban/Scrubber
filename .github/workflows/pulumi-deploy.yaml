@@ -62,15 +62,12 @@ jobs:
 
       - name: Create Lambda deployment package
         run: |
-          python3 -m venv venv
-          source venv/bin/activate
           mkdir package
           pip install -r requirements.txt -t package
           cd package
-          pip install numpy --upgrade
           zip -r ../lambda_deployment.zip .
           cd ..
-          zip lambda_deployment.zip main.py
+          zip -g lambda_deployment.zip main.py
         working-directory: packages/lambda
 
       - name: Ensure Pulumi stack exists
