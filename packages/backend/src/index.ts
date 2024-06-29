@@ -93,11 +93,15 @@ app.post(
       }),
     };
 
-    const lambdaRes = await lambda.invoke(lambdaParams).promise();
+    await lambda.invoke(lambdaParams).promise();
 
-    console.log("Lambda invocation result:", lambdaRes);
-
-    const checkProcessedBucket = async (): Promise<string | undefined> => {
+    const checkProcessedBucket = async (): Promise<
+      | {
+          url?: string;
+          metadata?: AWS.S3.HeadObjectOutput;
+        }
+      | undefined
+    > => {
       const uploadParams = {
         Bucket: "scrubber-user-uploads",
         Key: file.originalname,
@@ -108,40 +112,64 @@ app.post(
         Key: "processed_" + file.originalname,
       };
 
-      try {
-        // Check if the file exists in the processed bucket
-        await s3.headObject(processedParams).promise();
+      const wait = (ms: number) =>
+        new Promise((resolve) => setTimeout(resolve, ms));
+      const maxRetries = 5;
+      const delay = 5000;
 
-        // File exists in processed bucket
-        const signedUrl = s3.getSignedUrl("getObject", {
-          Bucket: "scrubber-processed-files",
-          Key: "processed_" + file.originalname,
-          Expires: 60,
-        });
-
-        return signedUrl;
-      } catch (processedErr: any) {
-        if (processedErr.code !== "NotFound") {
-          console.error("Error checking processed bucket:", processedErr);
-          throw processedErr;
-        }
-
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
-          await s3.headObject(uploadParams).promise();
-        } catch (uploadErr: any) {
-          if (uploadErr.code === "NotFound") {
-            console.error("File not found in either bucket");
-            throw new Error("File not found in either bucket");
-          } else {
-            console.error("Error checking user uploads bucket:", uploadErr);
-            throw uploadErr;
+          // Check if the file exists in the processed bucket
+          const processedHeadObject = await s3
+            .headObject(processedParams)
+            .promise();
+
+          // File exists in processed bucket
+          const signedUrl = s3.getSignedUrl("getObject", {
+            Bucket: "scrubber-processed-files",
+            Key: "processed_" + file.originalname,
+            Expires: 60,
+          });
+
+          return { url: signedUrl, metadata: processedHeadObject.Metadata };
+        } catch (processedErr: any) {
+          if (processedErr.code !== "NotFound") {
+            console.error("Error checking processed bucket:", processedErr);
+            throw processedErr;
+          }
+
+          try {
+            await s3.headObject(uploadParams).promise();
+            console.log(
+              "File found in user uploads bucket, waiting for processing..."
+            );
+          } catch (uploadErr: any) {
+            if (uploadErr.code === "NotFound") {
+              console.error("File not found in either bucket");
+              throw new Error("File not found in either bucket");
+            } else {
+              console.error("Error checking user uploads bucket:", uploadErr);
+              throw uploadErr;
+            }
           }
         }
-      }
-    };
 
-    const signedUrl = await checkProcessedBucket();
-    return res.status(200).send({ url: signedUrl });
+        await wait(delay);
+      }
+
+      console.error("File not processed within the expected time frame");
+      throw new Error("File not processed within the expected time frame");
+    };
+    try {
+      const response = await checkProcessedBucket();
+      if (!response) {
+        return res.status(400).send("File not processed");
+      }
+      return res.status(200).send(response);
+    } catch (error) {
+      console.error("Error processing file:", error);
+      return res.status(500).send("Error processing file");
+    }
   }
 );
 

@@ -76,7 +76,9 @@ export default function Home() {
         }
       );
       setIsLoading(false);
-      setProcessedFile(res.data.processedFile);
+      setProcessedFile(res.data);
+
+      console.log(res.data);
       setFile(null);
     } catch (error) {
       if (axios.isAxiosError(error)) {

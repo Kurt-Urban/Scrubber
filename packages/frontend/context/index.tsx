@@ -14,8 +14,10 @@ interface FileState {
   setFileError: (error: boolean) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
-  processedFile: string | null;
-  setProcessedFile: (file: string | null) => void;
+  processedFile: { url: string | null; metadata: any } | null;
+  setProcessedFile: (
+    file: { url: string | null; metadata: any } | null
+  ) => void;
 }
 
 const Reducer = (
@@ -85,7 +87,9 @@ export const FileProvider: FC<{ children: ReactNode }> = ({ children }) => {
     });
   }
 
-  function setProcessedFile(file: string | null) {
+  function setProcessedFile(
+    file: { url: string | null; metadata: any } | null
+  ) {
     dispatch({
       type: "SET_PROCESSED_FILE",
       payload: file,

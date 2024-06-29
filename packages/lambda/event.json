@@ -1,8 +1,9 @@
 {
-  "file_key": "breastcancer (1).csv",
+  "file_key": "seeds_dataset.csv",
   "cleaning_options": {
     "dropDuplicates": true,
-    "dropColumns": ["Age", "BMI"],
-    "fillNa": "drop"
+    "dropColumns": [],
+    "fillNa": "fill",
+    "fillNaValue": "mode"
   }
 }
