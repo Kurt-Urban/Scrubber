@@ -1,6 +1,5 @@
-import dotenv from "dotenv";
-import path from "path";
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+import * as dotenv from "dotenv";
+dotenv.config({ path: "packages/backend/.env" });
 
 import express, { Request, Response } from "express";
 import cors from "cors";
@@ -51,7 +50,6 @@ app.post(
         return true;
       } catch (error: any) {
         if (error?.code === "NotFound") {
-          console.log("Object does not exist");
           return false;
         } else {
           // Handle other potential errors
@@ -99,7 +97,7 @@ app.post(
 
     console.log("Lambda invocation result:", lambdaRes);
 
-    const checkProcessedBucket = async (): Promise<string> => {
+    const checkProcessedBucket = async (): Promise<string | undefined> => {
       const uploadParams = {
         Bucket: "scrubber-user-uploads",
         Key: file.originalname,
@@ -128,21 +126,13 @@ app.post(
           throw processedErr;
         }
 
-        // Check if the file exists in the user uploads bucket
         try {
           await s3.headObject(uploadParams).promise();
-          // File exists in user uploads bucket, but not yet processed
-          console.log(
-            "File exists in user uploads bucket, but not yet processed"
-          );
-          return "File exists in user uploads bucket, but not yet processed";
         } catch (uploadErr: any) {
           if (uploadErr.code === "NotFound") {
-            // File does not exist in either bucket
             console.error("File not found in either bucket");
             throw new Error("File not found in either bucket");
           } else {
-            // Other error while checking user uploads bucket
             console.error("Error checking user uploads bucket:", uploadErr);
             throw uploadErr;
           }
