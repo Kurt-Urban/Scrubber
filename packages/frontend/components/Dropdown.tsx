@@ -14,7 +14,7 @@ const Dropdown: FC = () => {
   return (
     <>
       <div
-        className={classNames("mt-4 w-3/4", {
+        className={classNames("mt-4 w-3/5", {
           visible: values.fillNa === "fill",
           hidden: values.fillNa !== "fill",
         })}
