@@ -2,11 +2,21 @@ import json
 import boto3
 import pandas as pd
 import io
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.metrics import MetricUnit
 
+logger = Logger(service="file_processor_service")
+metrics = Metrics(namespace="FileProcessorNamespace", service="file_processor_service")
+tracer = Tracer(service="file_processor_service")
+
+@logger.inject_lambda_context
+@metrics.log_metrics
+@tracer.capture_lambda_handler
 def lambda_handler(event, context):
+    logger.info("Lambda function started")
     try:
         # Print event for debugging
-        print("Event received:", json.dumps(event, indent=2))
+        logger.info(f"Event received: {json.dumps(event, indent=2)}")
 
         s3 = boto3.client("s3")
 
@@ -44,13 +54,22 @@ def lambda_handler(event, context):
             },
         )
 
+        # Custom metrics
+        metrics.add_metric(name="InvocationCount", unit=MetricUnit.Count, value=1)
+        metrics.add_metric(name="SuccessCount", unit=MetricUnit.Count, value=1)
+        
+        logger.info("Lambda function succeeded")
         return {
             "statusCode": 200,
             "body": json.dumps({"processed_file_key": processed_file_key}),
         }
 
     except Exception as e:
-        print("Error:", str(e))
+        logger.error(f"Error: {str(e)}")
+        
+        # Custom metrics
+        metrics.add_metric(name="ErrorCount", unit=MetricUnit.Count, value=1)
+        
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
 
 def sanitize_metadata_value(value):
@@ -58,33 +77,21 @@ def sanitize_metadata_value(value):
     return value.replace('\n', ' ').replace('\r', ' ')
 
 def preprocess_data(data, options):
-    report = []
-    stats = {
-        "totalRows": len(data),
-        "duplicateRows": 0,
-        "modifiedRows": 0,
-        "corruptedRows": 0,
-    }
-
     try:
         initial_rows = len(data)
-
-        # Drop duplicates
-        if options.get("dropDuplicates", False):
-            before_dedup = len(data)
-            data.drop_duplicates(inplace=True)
-            stats["duplicateRows"] = before_dedup - len(data)
-            report.append("Removed duplicates")
-
-        # Drop specified columns if the list is longer than 0
-        if "dropColumns" in options and len(options["dropColumns"]) > 0:
-            columns_to_drop = options["dropColumns"]
-            data.drop(columns=columns_to_drop, inplace=True, errors="ignore")
-            report.append(f"Dropped columns: {', '.join(columns_to_drop)}")
-
-        # Fill missing values
-        fill_na = options.get("fillNa", "none")
-        if fill_na != "none":
+        report = []
+        stats = {"totalRows": initial_rows, "duplicateRows": 0, "modifiedRows": 0, "corruptedRows": 0}
+        
+        # Example preprocessing steps
+        if options.get("removeDuplicates", False):
+            before_duplicates = len(data)
+            data = data.drop_duplicates()
+            after_duplicates = len(data)
+            stats["duplicateRows"] = before_duplicates - after_duplicates
+            report.append("Removed duplicate rows")
+        
+        if options.get("fillNa", False):
+            fill_na = options.get("fillNa")
             fill_custom_na_value = options.get("fillCustomNaValue", None)
             fill_na_value = options.get("fillNaValue", None)
             before_fillna = len(data)
