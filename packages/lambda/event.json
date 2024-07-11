@@ -3,6 +3,7 @@
   "cleaning_options": {
     "dropDuplicates": true,
     "dropColumns": ["Age", "BMI"],
-    "fillNa": "drop"
+    "fillNa": "drop",
+    "enableAnomalyDetection": true
   }
 }
