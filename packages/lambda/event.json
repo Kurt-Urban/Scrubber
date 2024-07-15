@@ -2,8 +2,8 @@
   "file_key": "seeds_dataset.csv",
   "cleaning_options": {
     "dropDuplicates": true,
-    "dropColumns": [],
-    "fillNa": "fill",
-    "fillNaValue": "mode"
+    "dropColumns": ["Age", "BMI"],
+    "fillNa": "drop",
+    "enableAnomalyDetection": true
   }
 }

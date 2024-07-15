@@ -2,3 +2,4 @@ boto3
 pandas
 aws-lambda-powertools
 aws-xray-sdk
+scikit-learn

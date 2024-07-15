@@ -4,6 +4,8 @@ import pandas as pd
 import io
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
+from sklearn.cluster import DBSCAN
+import numpy as np
 
 logger = Logger(service="file_processor_service")
 metrics = Metrics(namespace="FileProcessorNamespace", service="file_processor_service")
@@ -27,16 +29,21 @@ def lambda_handler(event, context):
         cleaning_options = event["cleaning_options"]
 
         # Read File
+        logger.info(f"Reading file from S3: {source_bucket_name}/{file_key}")
         obj = s3.get_object(Bucket=source_bucket_name, Key=file_key)
         data = pd.read_csv(io.BytesIO(obj["Body"].read()))
+        logger.info("File read successfully")
 
         # Preprocess Data and Generate Statistics Report
+        logger.info("Preprocessing data")
         processed_data, report, stats = preprocess_data(data, cleaning_options)
+        logger.info("Data preprocessing completed")
 
         # Sanitize the report for metadata
         sanitized_report = sanitize_metadata_value(report)
 
         # Save Processed File with Report and Statistics as Metadata
+        logger.info(f"Saving processed file to S3: {destination_bucket_name}/{processed_file_key}")
         output_buffer = io.BytesIO()
         processed_data.to_csv(output_buffer, index=False)
         output_buffer.seek(0)
@@ -51,8 +58,10 @@ def lambda_handler(event, context):
                 "duplicateRows": str(stats["duplicateRows"]),
                 "modifiedRows": str(stats["modifiedRows"]),
                 "corruptedRows": str(stats["corruptedRows"]),
+                "anomalousRows": str(stats["anomalousRows"]),
             },
         )
+        logger.info("Processed file saved successfully")
 
         # Custom metrics
         metrics.add_metric(name="InvocationCount", unit=MetricUnit.Count, value=1)
@@ -80,20 +89,29 @@ def preprocess_data(data, options):
     try:
         initial_rows = len(data)
         report = []
-        stats = {"totalRows": initial_rows, "duplicateRows": 0, "modifiedRows": 0, "corruptedRows": 0}
+        stats = {"totalRows": initial_rows, "duplicateRows": 0, "modifiedRows": 0, "corruptedRows": 0, "anomalousRows": 0}
         
         # Example preprocessing steps
-        if options.get("removeDuplicates", False):
+        if options.get("dropDuplicates", False):
+            logger.info("Removing duplicate rows")
             before_duplicates = len(data)
             data = data.drop_duplicates()
             after_duplicates = len(data)
             stats["duplicateRows"] = before_duplicates - after_duplicates
             report.append("Removed duplicate rows")
+            logger.info(f"Removed {stats['duplicateRows']} duplicate rows")
+
+        if "dropColumns" in options:
+            columns_to_drop = options["dropColumns"]
+            data.drop(columns=columns_to_drop, inplace=True, errors='ignore')
+            report.append(f"Dropped columns: {', '.join(columns_to_drop)}")
+            logger.info(f"Dropped columns: {', '.join(columns_to_drop)}")
         
         if options.get("fillNa", False):
             fill_na = options.get("fillNa")
             fill_custom_na_value = options.get("fillCustomNaValue", None)
             fill_na_value = options.get("fillNaValue", None)
+            logger.info(f"Filling missing values using {fill_na} method")
             before_fillna = len(data)
             data = fill_missing_values(
                 data, fill_na, fill_na_value, fill_custom_na_value
@@ -101,10 +119,22 @@ def preprocess_data(data, options):
             after_fillna = len(data.dropna())
             stats["modifiedRows"] = before_fillna - after_fillna
             report.append(f"Filled missing values using {fill_na} method")
+            logger.info(f"Filled missing values using {fill_na} method")
+
+        # Anomaly detection using DBSCAN
+        if options.get("enableAnomalyDetection", False):
+            logger.info("Detecting anomalies using DBSCAN")
+            anomalous_data, num_anomalies = detect_anomalies(data)
+            data = anomalous_data
+            stats["anomalousRows"] = num_anomalies
+            report.append(f"Detected {num_anomalies} anomalous rows using DBSCAN")
+            logger.info(f"Detected {num_anomalies} anomalous rows using DBSCAN")
 
         stats["corruptedRows"] = initial_rows - len(data)
+        logger.info("Preprocessing complete")
         return data, "\n".join(report), stats
     except Exception as e:
+        logger.error(f"Error in preprocessing data: {str(e)}")
         raise Exception(f"Error in preprocessing data: {str(e)}")
 
 def fill_missing_values(data, fill_na, fill_na_value, fill_custom_na_value):
@@ -124,9 +154,30 @@ def fill_missing_values(data, fill_na, fill_na_value, fill_custom_na_value):
                 data.fillna(fill_custom_na_value, inplace=True)
             else:
                 raise ValueError("Invalid fillNaValue provided.")
+        logger.info("Filled missing values successfully")
         return data
     except Exception as e:
+        logger.error(f"Error in filling missing values: {str(e)}")
         raise Exception(f"Error in filling missing values: {str(e)}")
+
+def detect_anomalies(data):
+    try:
+        # Assuming data is numerical for simplicity; preprocessing may be needed for real-world data
+        data_for_clustering = data.select_dtypes(include=[np.number]).dropna()
+        
+        # Apply DBSCAN
+        dbscan = DBSCAN(eps=0.5, min_samples=5)
+        clusters = dbscan.fit_predict(data_for_clustering)
+        
+        # Flag anomalies
+        data['anomaly'] = (clusters == -1).astype(int)
+        num_anomalies = sum(clusters == -1)
+        logger.info(f"Anomalies detected: {num_anomalies}")
+        
+        return data, num_anomalies
+    except Exception as e:
+        logger.error(f"Error in detecting anomalies: {str(e)}")
+        raise Exception(f"Error in detecting anomalies: {str(e)}")
 
 def correct_data_formats(data):
     try:
@@ -136,6 +187,10 @@ def correct_data_formats(data):
             except (ValueError, TypeError):
                 pass
 
+        logger.info("Corrected data formats successfully")
         return data
     except Exception as e:
+        logger.error(f"Error in correcting data formats: {str(e)}")
         raise Exception(f"Error in correcting data formats: {str(e)}")
+
+

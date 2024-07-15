@@ -42,6 +42,7 @@ def test_lambda_handler():
     processed_file_key = "processed_" + event["file_key"]
 
     try:
+        print(f"Fetching processed file from S3: {processed_file_key}")
         processed_file = s3.get_object(
             Bucket=destination_bucket_name, Key=processed_file_key
         )
@@ -50,6 +51,8 @@ def test_lambda_handler():
         print(processed_data)
     except s3.exceptions.NoSuchKey:
         print(f"No such key: {processed_file_key}")
+    except Exception as e:
+        print(f"Error fetching processed file: {e}")
 
 if __name__ == "__main__":
     test_lambda_handler()
