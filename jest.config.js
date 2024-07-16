@@ -1,9 +1,21 @@
+const path = require("path");
+
 module.exports = {
   preset: "ts-jest",
-  testEnvironment: "node",
+  testEnvironment: "jest-environment-jsdom",
+  // setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx"],
   testMatch: ["**/?(*.)+(spec|test).ts?(x)"],
   transform: {
-    "^.+\\.tsx?$": "ts-jest",
+    "^.+\\.tsx?$": [
+      "ts-jest",
+      {
+        tsconfig: path.resolve(__dirname, "packages/frontend/tsconfig.json"),
+      },
+    ],
+  },
+  moduleNameMapper: {
+    "\\.css$": "identity-obj-proxy",
+    "@/(.*)$": "<rootDir>/packages/frontend/$1",
   },
 };
