@@ -1,7 +1,6 @@
 import AWSMock from "aws-sdk-mock";
 import app from "../src/index";
 import request from "supertest";
-import { after } from "node:test";
 
 const AWS = require("aws-sdk");
 
