@@ -7,11 +7,19 @@ import bodyParser from "body-parser";
 import AWS from "aws-sdk";
 import multer from "multer";
 
-AWS.config = new AWS.Config({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION,
-});
+let s3: AWS.S3;
+let lambda: AWS.Lambda;
+
+function configureAWS() {
+  AWS.config.update({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION,
+  });
+
+  s3 = new AWS.S3();
+  lambda = new AWS.Lambda();
+}
 
 const app = express();
 app.use(cors());
@@ -22,9 +30,6 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-const s3 = new AWS.S3();
-const lambda = new AWS.Lambda();
-
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).send("Server is healthy");
 });
@@ -33,6 +38,9 @@ app.post(
   "/process",
   upload.single("file"),
   async (req: Request, res: Response) => {
+    if (!s3 || !lambda) {
+      configureAWS();
+    }
     const file = req?.file;
 
     if (!file) {
@@ -59,8 +67,10 @@ app.post(
       }
     };
 
+    // Check if the file already exists in the user uploads bucket
     const fileExists = await checkFileExists();
 
+    // If the file doesn't exist, upload it to S3
     if (!fileExists) {
       try {
         const uploadParams = {
@@ -78,7 +88,7 @@ app.post(
 
         await s3.upload(uploadParams).promise();
       } catch (err) {
-        console.error("Error uploading file or invoking Lambda function:", err);
+        console.error("Error uploading file to S3:", err);
         res.status(500).send("Error processing request");
       }
     }
@@ -93,7 +103,13 @@ app.post(
       }),
     };
 
-    await lambda.invoke(lambdaParams).promise();
+    // Invoke the Lambda function to process the file
+    try {
+      await lambda.invoke(lambdaParams).promise();
+    } catch (err) {
+      console.error("Error invoking Lambda function:", err);
+      return res.status(500).send("Error processing request");
+    }
 
     const checkProcessedBucket = async (): Promise<
       | {
@@ -102,20 +118,13 @@ app.post(
         }
       | undefined
     > => {
-      const uploadParams = {
-        Bucket: "scrubber-user-uploads",
-        Key: file.originalname,
-      };
-
       const processedParams = {
         Bucket: "scrubber-processed-files",
         Key: "processed_" + file.originalname,
       };
 
-      const wait = (ms: number) =>
-        new Promise((resolve) => setTimeout(resolve, ms));
-      const maxRetries = 5;
-      const delay = 5000;
+      const maxRetries = 3;
+      const delay = 3000;
 
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
@@ -137,29 +146,16 @@ app.post(
             console.error("Error checking processed bucket:", processedErr);
             throw processedErr;
           }
-
-          try {
-            await s3.headObject(uploadParams).promise();
-            console.log(
-              "File found in user uploads bucket, waiting for processing..."
-            );
-          } catch (uploadErr: any) {
-            if (uploadErr.code === "NotFound") {
-              console.error("File not found in either bucket");
-              throw new Error("File not found in either bucket");
-            } else {
-              console.error("Error checking user uploads bucket:", uploadErr);
-              throw uploadErr;
-            }
-          }
         }
 
-        await wait(delay);
+        // Wait before retrying
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
 
       console.error("File not processed within the expected time frame");
       throw new Error("File not processed within the expected time frame");
     };
+
     try {
       const response = await checkProcessedBucket();
       if (!response) {
