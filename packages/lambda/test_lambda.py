@@ -1,8 +1,13 @@
 import json
 import boto3
-from main import lambda_handler
+import pandas as pd
+import io
+from main import lambda_handler, preprocess_data, detect_anomalies
 from dotenv import load_dotenv
 import os
+import unittest
+from unittest.mock import patch, MagicMock
+from moto import mock_s3
 
 # Load environment variables from .env file
 load_dotenv()
@@ -54,5 +59,65 @@ def test_lambda_handler():
     except Exception as e:
         print(f"Error fetching processed file: {e}")
 
+class TestLambdaFunction(unittest.TestCase):
+
+    @mock_s3
+    def setUp(self):
+        # Set up mock S3
+        self.s3 = boto3.client("s3", region_name="us-east-1")
+        self.source_bucket = "scrubber-user-uploads"
+        self.destination_bucket = "scrubber-processed-files"
+        self.s3.create_bucket(Bucket=self.source_bucket)
+        self.s3.create_bucket(Bucket=self.destination_bucket)
+
+        # Upload a mock CSV file
+        self.file_key = "test.csv"
+        csv_data = "col1,col2,col3\n1,2,3\n4,5,6\n7,8,9\n"
+        self.s3.put_object(Bucket=self.source_bucket, Key=self.file_key, Body=csv_data)
+
+        # Define event and context
+        self.event = {
+            "file_key": self.file_key,
+            "cleaning_options": {
+                "dropDuplicates": False,
+                "dropColumns": ["col3"],
+                "fillNa": "drop",
+                "enableAnomalyDetection": True
+            }
+        }
+        self.context = MagicMock()
+
+    def test_lambda_handler_success(self):
+        response = lambda_handler(self.event, self.context)
+        self.assertEqual(response["statusCode"], 200)
+        self.assertIn("processed_file_key", json.loads(response["body"]))
+
+    def test_lambda_handler_error(self):
+        with patch("main.s3.get_object", side_effect=Exception("S3 error")):
+            response = lambda_handler(self.event, self.context)
+            self.assertEqual(response["statusCode"], 500)
+            self.assertIn("error", json.loads(response["body"]))
+
+    def test_preprocess_data(self):
+        csv_data = pd.read_csv(io.StringIO("col1,col2,col3\n1,2,3\n4,5,6\n7,8,9\n"))
+        options = {
+            "dropDuplicates": False,
+            "dropColumns": ["col3"],
+            "fillNa": "drop",
+            "enableAnomalyDetection": True
+        }
+        processed_data, report, stats = preprocess_data(csv_data, options)
+        self.assertIn("Dropped columns: col3", report)
+        self.assertEqual(stats["totalRows"], 3)
+        self.assertEqual(stats["anomalousRows"], 0)
+
+    def test_detect_anomalies(self):
+        csv_data = pd.read_csv(io.StringIO("col1,col2,col3\n1,2,3\n4,5,6\n7,8,9\n"))
+        anomalous_data, num_anomalies = detect_anomalies(csv_data)
+        self.assertEqual(num_anomalies, 0)
+        self.assertIn("anomaly", anomalous_data.columns)
+        self.assertEqual(anomalous_data["anomaly"].sum(), 0)
+
 if __name__ == "__main__":
     test_lambda_handler()
+    unittest.main()
