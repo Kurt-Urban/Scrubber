@@ -43,11 +43,11 @@ def lambda_handler(event, context):
         sanitized_report = sanitize_metadata_value(report)
 
         # Save Processed File with Report and Statistics as Metadata
+        processed_file_key = "processed_" + file_key
         logger.info(f"Saving processed file to S3: {destination_bucket_name}/{processed_file_key}")
         output_buffer = io.BytesIO()
         processed_data.to_csv(output_buffer, index=False)
         output_buffer.seek(0)
-        processed_file_key = "processed_" + file_key
         s3.put_object(
             Bucket=destination_bucket_name,
             Key=processed_file_key,
@@ -192,5 +192,3 @@ def correct_data_formats(data):
     except Exception as e:
         logger.error(f"Error in correcting data formats: {str(e)}")
         raise Exception(f"Error in correcting data formats: {str(e)}")
-
-
