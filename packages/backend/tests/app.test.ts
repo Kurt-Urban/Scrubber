@@ -13,11 +13,13 @@ describe("POST /process", () => {
     AWSMock.restore();
     jest.useRealTimers();
   });
-
+  afterAll((done) => {
+    app.close(done);
+  });
   it("should handle file upload and processing", async () => {
     // Mock successful file upload to S3
     AWSMock.mock("S3", "upload", (params, callback) => {
-      callback(null, { url: "http://localhost:" });
+      callback(null, { url: "http://localhost" });
     });
 
     // Mock successful Lambda invocation
