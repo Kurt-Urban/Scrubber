@@ -11,59 +11,35 @@ logger = Logger(service="file_processor_service")
 metrics = Metrics(namespace="FileProcessorNamespace", service="file_processor_service")
 tracer = Tracer(service="file_processor_service")
 
+s3 = boto3.client("s3")
+
 @logger.inject_lambda_context
 @metrics.log_metrics
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):
     logger.info("Lambda function started")
     try:
-        # Print event for debugging
         logger.info(f"Event received: {json.dumps(event, indent=2)}")
-
-        s3 = boto3.client("s3")
-
-        # Hardcode bucket names
         source_bucket_name = "scrubber-user-uploads"
         destination_bucket_name = "scrubber-processed-files"
         file_key = event["file_key"]
         cleaning_options = event["cleaning_options"]
 
-        # Read File
         logger.info(f"Reading file from S3: {source_bucket_name}/{file_key}")
-        obj = s3.get_object(Bucket=source_bucket_name, Key=file_key)
-        data = pd.read_csv(io.BytesIO(obj["Body"].read()))
+        data = read_csv_from_s3(source_bucket_name, file_key)
         logger.info("File read successfully")
 
-        # Preprocess Data and Generate Statistics Report
         logger.info("Preprocessing data")
         processed_data, report, stats = preprocess_data(data, cleaning_options)
         logger.info("Data preprocessing completed")
 
-        # Sanitize the report for metadata
         sanitized_report = sanitize_metadata_value(report)
 
-        # Save Processed File with Report and Statistics as Metadata
         processed_file_key = "processed_" + file_key
         logger.info(f"Saving processed file to S3: {destination_bucket_name}/{processed_file_key}")
-        output_buffer = io.BytesIO()
-        processed_data.to_csv(output_buffer, index=False)
-        output_buffer.seek(0)
-        s3.put_object(
-            Bucket=destination_bucket_name,
-            Key=processed_file_key,
-            Body=output_buffer,
-            Metadata={
-                "processing_report": sanitized_report,
-                "totalRows": str(stats["totalRows"]),
-                "duplicateRows": str(stats["duplicateRows"]),
-                "modifiedRows": str(stats["modifiedRows"]),
-                "corruptedRows": str(stats["corruptedRows"]),
-                "anomalousRows": str(stats["anomalousRows"]),
-            },
-        )
+        write_csv_to_s3(processed_data, destination_bucket_name, processed_file_key, sanitized_report, stats)
         logger.info("Processed file saved successfully")
 
-        # Custom metrics
         metrics.add_metric(name="InvocationCount", unit=MetricUnit.Count, value=1)
         metrics.add_metric(name="SuccessCount", unit=MetricUnit.Count, value=1)
         
@@ -75,14 +51,40 @@ def lambda_handler(event, context):
 
     except Exception as e:
         logger.error(f"Error: {str(e)}")
-        
-        # Custom metrics
         metrics.add_metric(name="ErrorCount", unit=MetricUnit.Count, value=1)
-        
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
 
+def read_csv_from_s3(bucket_name, file_key):
+    try:
+        obj = s3.get_object(Bucket=bucket_name, Key=file_key)
+        return pd.read_csv(io.BytesIO(obj["Body"].read()))
+    except Exception as e:
+        logger.error(f"Error in reading CSV from S3: {str(e)}")
+        raise Exception("S3 error")
+
+def write_csv_to_s3(data, bucket_name, file_key, report, stats):
+    try:
+        output_buffer = io.BytesIO()
+        data.to_csv(output_buffer, index=False)
+        output_buffer.seek(0)
+        s3.put_object(
+            Bucket=bucket_name,
+            Key=file_key,
+            Body=output_buffer,
+            Metadata={
+                "processing_report": report,
+                "totalRows": str(stats["totalRows"]),
+                "duplicateRows": str(stats["duplicateRows"]),
+                "modifiedRows": str(stats["modifiedRows"]),
+                "corruptedRows": str(stats["corruptedRows"]),
+                "anomalousRows": str(stats["anomalousRows"]),
+            },
+        )
+    except Exception as e:
+        logger.error(f"Error in writing CSV to S3: {str(e)}")
+        raise Exception("S3 error")
+
 def sanitize_metadata_value(value):
-    """Sanitize metadata value to be a valid HTTP header value."""
     return value.replace('\n', ' ').replace('\r', ' ')
 
 def preprocess_data(data, options):
@@ -91,14 +93,13 @@ def preprocess_data(data, options):
         report = []
         stats = {"totalRows": initial_rows, "duplicateRows": 0, "modifiedRows": 0, "corruptedRows": 0, "anomalousRows": 0}
         
-        # Example preprocessing steps
         if options.get("dropDuplicates", False):
             logger.info("Removing duplicate rows")
             before_duplicates = len(data)
             data = data.drop_duplicates()
             after_duplicates = len(data)
             stats["duplicateRows"] = before_duplicates - after_duplicates
-            report.append("Removed duplicate rows")
+            report.append(f"Removed {stats['duplicateRows']} duplicate rows")
             logger.info(f"Removed {stats['duplicateRows']} duplicate rows")
 
         if "dropColumns" in options:
@@ -121,7 +122,6 @@ def preprocess_data(data, options):
             report.append(f"Filled missing values using {fill_na} method")
             logger.info(f"Filled missing values using {fill_na} method")
 
-        # Anomaly detection using DBSCAN
         if options.get("enableAnomalyDetection", False):
             logger.info("Detecting anomalies using DBSCAN")
             anomalous_data, num_anomalies = detect_anomalies(data)
@@ -154,7 +154,7 @@ def fill_missing_values(data, fill_na, fill_na_value, fill_custom_na_value):
                 data.fillna(fill_custom_na_value, inplace=True)
             else:
                 raise ValueError("Invalid fillNaValue provided.")
-        logger.info("Filled missing values successfully")
+        logger.info(f"Filled missing values successfully with method {fill_na} and value {fill_na_value}")
         return data
     except Exception as e:
         logger.error(f"Error in filling missing values: {str(e)}")
@@ -162,18 +162,12 @@ def fill_missing_values(data, fill_na, fill_na_value, fill_custom_na_value):
 
 def detect_anomalies(data):
     try:
-        # Assuming data is numerical for simplicity; preprocessing may be needed for real-world data
         data_for_clustering = data.select_dtypes(include=[np.number]).dropna()
-        
-        # Apply DBSCAN
         dbscan = DBSCAN(eps=0.5, min_samples=5)
         clusters = dbscan.fit_predict(data_for_clustering)
-        
-        # Flag anomalies
         data['anomaly'] = (clusters == -1).astype(int)
         num_anomalies = sum(clusters == -1)
         logger.info(f"Anomalies detected: {num_anomalies}")
-        
         return data, num_anomalies
     except Exception as e:
         logger.error(f"Error in detecting anomalies: {str(e)}")
@@ -186,7 +180,6 @@ def correct_data_formats(data):
                 data[column] = pd.to_datetime(data[column])
             except (ValueError, TypeError):
                 pass
-
         logger.info("Corrected data formats successfully")
         return data
     except Exception as e:
