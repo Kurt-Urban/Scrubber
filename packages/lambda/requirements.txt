@@ -3,3 +3,5 @@ pandas
 aws-lambda-powertools
 aws-xray-sdk
 scikit-learn
+numpy
+moto==3.1.16
