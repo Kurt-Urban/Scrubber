@@ -1,22 +1,14 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import axios from "axios";
 import { Formik, FormikProps, Form } from "formik";
-import {
-  Checkbox,
-  Dropdown,
-  Radio,
-  Spinner,
-  Statistics,
-  UploadParams,
-} from "@/components";
+import { Spinner, Statistics, UploadParams } from "@/components";
 import * as yup from "yup";
-import classNames from "classnames";
-import { MdCheckBox, MdOutlineDeleteOutline } from "react-icons/md";
-import { FileProvider, useFileContext } from "@/context";
+import { useFileContext } from "@/context";
 
 export type CleaningParams = {
   dropDuplicates: boolean;
+  detectAnomalies: boolean;
   dropColumns: string[];
   fillNa: "drop" | "fill" | "none";
   fillNaValue?: "median" | "mean" | "mode" | "backwards" | "custom" | "";
@@ -30,6 +22,7 @@ interface FormValues extends CleaningParams {
 const defaultValues: FormValues = {
   confirmSend: false,
   dropDuplicates: true,
+  detectAnomalies: true,
   dropColumns: [],
   fillNa: "none",
   fillNaValue: "",
@@ -76,7 +69,9 @@ export default function Home() {
         }
       );
       setIsLoading(false);
-      setProcessedFile(res.data.processedFile);
+      setProcessedFile(res.data);
+
+      console.log(res.data);
       setFile(null);
     } catch (error) {
       if (axios.isAxiosError(error)) {

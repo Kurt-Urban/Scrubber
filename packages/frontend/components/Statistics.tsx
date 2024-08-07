@@ -5,44 +5,39 @@ import { Doughnut } from "react-chartjs-2";
 import "chart.js/auto";
 
 type Stats = {
-  totalRows: number;
-  duplicateRows: number;
-  modifiedRows: number;
-  corruptedRows: number;
+  totalrows: number;
+  duplicaterows: number;
+  modifiedrows: number;
+  corruptedrows: number;
 };
 
 const Statistics: FC = () => {
   const { processedFile } = useFileContext();
 
-  const stats: Stats = {
-    totalRows: 100,
-    duplicateRows: 20,
-    modifiedRows: 30,
-    corruptedRows: 10,
-  };
+  const stats = processedFile?.metadata as Stats;
 
   const data = {
     labels: [
-      `Duplicate Rows (${stats.duplicateRows})`,
-      `Modified Rows (${stats.modifiedRows})`,
-      `Corrupted Rows (${stats.corruptedRows})`,
+      `Duplicate Rows (${stats.duplicaterows})`,
+      `Modified Rows (${stats.modifiedrows})`,
+      `Corrupted Rows (${stats.corruptedrows})`,
       `Remaining Rows (${
-        stats.totalRows -
-        stats.duplicateRows -
-        stats.modifiedRows -
-        stats.corruptedRows
+        stats.totalrows -
+        stats.duplicaterows -
+        stats.modifiedrows -
+        stats.corruptedrows
       })`,
     ],
     datasets: [
       {
         data: [
-          stats.duplicateRows,
-          stats.modifiedRows,
-          stats.corruptedRows,
-          stats.totalRows -
-            stats.duplicateRows -
-            stats.modifiedRows -
-            stats.corruptedRows,
+          stats.duplicaterows,
+          stats.modifiedrows,
+          stats.corruptedrows,
+          stats.totalrows -
+            stats.duplicaterows -
+            stats.modifiedrows -
+            stats.corruptedrows,
         ],
         backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0"],
         hoverBackgroundColor: ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0"],
@@ -56,7 +51,7 @@ const Statistics: FC = () => {
         <span className="flex items-center mt-6">
           <h2 className="text-xl mr-3 text-gray-700">Processed File:</h2>
           <a
-            href={processedFile || ""}
+            href={processedFile?.url || ""}
             download="processed.csv"
             className="py-2 px-4 bg-blue-700 rounded text-gray-300 transition-all hover:bg-blue-800"
           >
@@ -69,7 +64,7 @@ const Statistics: FC = () => {
         <div className="w-1/2">
           <div className="text-xl text-center text-gray-700">Statistics</div>
           <div className="text-center text-gray-700 mb-2">
-            Total Rows Processed: {stats.totalRows}
+            Total Rows Processed: {stats.totalrows}
           </div>
           <Doughnut data={data} />
         </div>

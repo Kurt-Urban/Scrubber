@@ -146,16 +146,20 @@ const UploadParams: FC = ({}) => {
           </div>
         </div>
         <hr className="border border-blue-gray-200" />
-        <div className="flex transition-all duration-1000 ">
-          <div className="w-1/3 mt-3">
+        <span className="w-full flex justify-center my-2 text-gray-700 text-lg">
+          Cleaning Options:
+        </span>
+        <div className="w-full flex justify-center">
+          <div>
             <Checkbox name="dropDuplicates" label="Drop duplicate rows" />
+            <Checkbox name="detectAnomalies" label="Detect Anomalies" />
             <Radio name="fillNa" label="Allow missing values" value="none" />
             <Radio name="fillNa" label="Drop missing values" value="drop" />
             <Radio name="fillNa" label="Fill missing values" value="fill" />
           </div>
           <Dropdown />
         </div>
-        <div className="mt-3">
+        <div className="mt-4">
           <div className="relative h-10">
             <button
               type="submit"
