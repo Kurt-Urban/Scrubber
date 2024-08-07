@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "start:frontend": "yarn workspace frontend dev",
+    "watch:backend": "yarn workspace backend watch",
     "start:backend": "yarn workspace backend start",
     "build:frontend": "yarn workspace frontend build",
     "build:backend": "yarn workspace backend build",

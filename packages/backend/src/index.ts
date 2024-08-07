@@ -48,7 +48,7 @@ app.post(
     }
 
     const params = {
-      Bucket: "scrubber-user-uploads",
+      Bucket: process.env.USER_BUCKET_NAME as string,
       Key: file.originalname,
     };
 
@@ -74,7 +74,7 @@ app.post(
     if (!fileExists) {
       try {
         const uploadParams = {
-          Bucket: "scrubber-user-uploads",
+          Bucket: process.env.USER_BUCKET_NAME as string,
           Key: file.originalname,
           Body: file.buffer,
           Metadata: {
@@ -97,7 +97,7 @@ app.post(
       FunctionName: "lambda_process_file",
       InvocationType: "Event",
       Payload: JSON.stringify({
-        bucket: "scrubber-user-uploads",
+        bucket: process.env.USER_BUCKET_NAME as string,
         key: file.originalname,
         params: JSON.parse(req.body.params),
       }),
@@ -119,7 +119,7 @@ app.post(
       | undefined
     > => {
       const processedParams = {
-        Bucket: "scrubber-processed-files",
+        Bucket: process.env.PROCESSED_BUCKET_NAME as string,
         Key: "processed_" + file.originalname,
       };
 
@@ -135,7 +135,7 @@ app.post(
 
           // File exists in processed bucket
           const signedUrl = s3.getSignedUrl("getObject", {
-            Bucket: "scrubber-processed-files",
+            Bucket: process.env.PROCESSED_BUCKET_NAME as string,
             Key: "processed_" + file.originalname,
             Expires: 60,
           });
