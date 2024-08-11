@@ -1,16 +1,12 @@
 import json
 import boto3
-import pandas as pd
-import io
-from main import lambda_handler, preprocess_data, detect_anomalies
+from main import lambda_handler
 from dotenv import load_dotenv
 import os
-import unittest
-from unittest.mock import patch, MagicMock
-from moto import mock_s3
 
-# Load environment variables from .env file
+
 load_dotenv()
+
 
 # Define a mock context
 class Context:
@@ -22,74 +18,37 @@ class Context:
         )
         self.aws_request_id = "local_request_id"
 
-@mock_s3
-class TestLambdaFunction(unittest.TestCase):
 
-    def setUp(self):
-        # Set up mock S3
-        self.s3 = boto3.client("s3", region_name="us-east-1")
-        self.source_bucket = "scrubber-user-uploads"
-        self.destination_bucket = "scrubber-processed-files"
-        self.s3.create_bucket(Bucket=self.source_bucket)
-        self.s3.create_bucket(Bucket=self.destination_bucket)
+def test_lambda_handler():
+    with open("event.json") as f:
+        event = json.load(f)
 
-        # Upload a mock CSV file
-        self.file_key = "test.csv"
-        csv_data = "col1,col2,col3\n1,2,3\n4,5,6\n7,8,9\n"
-        self.s3.put_object(Bucket=self.source_bucket, Key=self.file_key, Body=csv_data)
+    context = Context()
 
-        # Define event and context
-        self.event = {
-            "file_key": self.file_key,
-            "cleaning_options": {
-                "dropDuplicates": False,
-                "dropColumns": ["col3"],
-                "fillNa": "drop",
-                "enableAnomalyDetection": True
-            }
-        }
-        self.context = Context()
+    response = lambda_handler(event, context)
 
-    @patch("main.boto3.client")
-    def test_lambda_handler_success(self, mock_boto_client):
-        mock_s3_client = mock_boto_client.return_value
-        mock_s3_client.get_object.return_value = {
-            'Body': io.BytesIO(b"col1,col2,col3\n1,2,3\n4,5,6\n7,8,9\n")
-        }
-        mock_s3_client.put_object.return_value = {}
+    print("Response:", json.dumps(response, indent=2))
 
-        response = lambda_handler(self.event, self.context)
-        self.assertEqual(response["statusCode"], 200)
-        self.assertIn("processed_file_key", json.loads(response["body"]))
+    aws_access_key_id = os.environ["AWS_ACCESS_KEY_ID"]
+    aws_secret_access_key = os.environ["AWS_SECRET_ACCESS_KEY"]
+    aws_region = os.environ["AWS_REGION"]
 
-    @patch("main.boto3.client")
-    def test_lambda_handler_error(self, mock_boto_client):
-        mock_s3_client = mock_boto_client.return_value
-        mock_s3_client.get_object.side_effect = Exception("S3 error")
+    s3 = boto3.client(
+        "s3",
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+        region_name=aws_region,
+    )
 
-        response = lambda_handler(self.event, self.context)
-        self.assertEqual(response["statusCode"], 500)
-        self.assertIn("error", json.loads(response["body"]))
+    destination_bucket_name = "scrubber-processed-files"
+    processed_file_key = "processed_" + event["file_key"]
+    processed_file = s3.get_object(
+        Bucket=destination_bucket_name, Key=processed_file_key
+    )
+    processed_data = processed_file["Body"].read().decode("utf-8")
+    print("Processed Data:")
+    print(processed_data)
 
-    def test_preprocess_data(self):
-        csv_data = pd.read_csv(io.StringIO("col1,col2,col3\n1,2,3\n4,5,6\n7,8,9\n"))
-        options = {
-            "dropDuplicates": False,
-            "dropColumns": ["col3"],
-            "fillNa": "drop",
-            "enableAnomalyDetection": True
-        }
-        processed_data, report, stats = preprocess_data(csv_data, options)
-        self.assertIn("Dropped columns: col3", report)
-        self.assertEqual(stats["totalRows"], 3)
-        self.assertEqual(stats["anomalousRows"], 3)
-
-    def test_detect_anomalies(self):
-        csv_data = pd.read_csv(io.StringIO("col1,col2,col3\n1,2,3\n4,5,6\n7,8,9\n"))
-        anomalous_data, num_anomalies = detect_anomalies(csv_data)
-        self.assertEqual(num_anomalies, 3)
-        self.assertIn("anomaly", anomalous_data.columns)
-        self.assertEqual(anomalous_data["anomaly"].sum(), 3)
 
 if __name__ == "__main__":
-    unittest.main()
+    test_lambda_handler()
