@@ -9,6 +9,7 @@ type Stats = {
   duplicaterows: number;
   modifiedrows: number;
   corruptedrows: number;
+  anomalousrows: number;
 };
 
 const Statistics: FC = () => {
@@ -21,11 +22,13 @@ const Statistics: FC = () => {
       `Duplicate Rows (${stats.duplicaterows})`,
       `Modified Rows (${stats.modifiedrows})`,
       `Corrupted Rows (${stats.corruptedrows})`,
+      `Anomalous Rows (${stats.anomalousrows})`,
       `Remaining Rows (${
         stats.totalrows -
         stats.duplicaterows -
         stats.modifiedrows -
-        stats.corruptedrows
+        stats.corruptedrows -
+        stats.anomalousrows
       })`,
     ],
     datasets: [
@@ -34,13 +37,27 @@ const Statistics: FC = () => {
           stats.duplicaterows,
           stats.modifiedrows,
           stats.corruptedrows,
+          stats.anomalousrows,
           stats.totalrows -
             stats.duplicaterows -
             stats.modifiedrows -
-            stats.corruptedrows,
+            stats.corruptedrows -
+            stats.anomalousrows,
         ],
-        backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0"],
-        hoverBackgroundColor: ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0"],
+        backgroundColor: [
+          "#FF6384",
+          "#36A2EB",
+          "#FFCE56",
+          "#4BC0C0",
+          "#8d94d9",
+        ],
+        hoverBackgroundColor: [
+          "#FF6384",
+          "#36A2EB",
+          "#FFCE56",
+          "#4BC0C0",
+          "#8d94d9",
+        ],
       },
     ],
   };
