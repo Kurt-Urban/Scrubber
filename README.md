@@ -33,7 +33,7 @@ To set up and run Project Scrubber locally, you need to have the following insta
 1. **Clone the repository:**
 
    ```sh
-   git clone https://github.com/yourusername/project-scrubber.git
+   git clone https://github.com/Kurt-Urban/Scrubber.git
 
    cd project-scrubber
    ```
