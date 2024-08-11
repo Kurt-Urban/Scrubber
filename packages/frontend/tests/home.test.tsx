@@ -96,4 +96,47 @@ describe("Home Component", () => {
 
     expect(mockAxios.history.post.length).toBe(1);
   });
+  it("should handle anomalies checkbox", async () => {
+    render(
+      <FileProvider>
+        <Home />
+      </FileProvider>
+    );
+
+    // Simulate checking the anomalies checkbox
+    fireEvent.click(screen.getByLabelText("Anomalies"));
+
+    // Simulate setting processed file
+    fireEvent.click(screen.getByText("Set Processed File"));
+
+    expect(await screen.findByText("Anomalies")).toBeInTheDocument(); // Ensure Anomalies component renders
+  });
+
+  it("should handle anomalies checkbox with file upload and processing", async () => {
+    mockAxios
+      .onPost("/process")
+      .reply(200, { url: "http://example.com", metadata: {} });
+
+    render(
+      <FileProvider>
+        <Home />
+      </FileProvider>
+    );
+
+    // Simulate checking the anomalies checkbox
+    fireEvent.click(screen.getByLabelText("Anomalies"));
+
+    const file = new File(["file content"], "test.csv", { type: "text/csv" });
+    const input = screen.getByTestId("file-input");
+
+    fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.click(screen.getByText("Submit"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Anomalies")).toBeInTheDocument(); // Ensure Anomalies component renders
+    });
+
+    expect(mockAxios.history.post.length).toBe(1);
+    expect(mockAxios.history.post[0].url).toBe("http://localhost:3001/process");
+  });
 });
